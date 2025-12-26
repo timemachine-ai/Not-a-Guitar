@@ -24,6 +24,7 @@ export function useHandTracking() {
   const frettedNotesRef = useRef<Record<number, number>>({});
   const lastStrumPosRef = useRef<Record<number, number | undefined>>({});
   const strumCooldownRef = useRef<Record<number, boolean>>({});
+  const onResultsRef = useRef<((results: Results) => void) | null>(null);
 
   const initMediaPipe = useCallback(async (
     video: HTMLVideoElement,
@@ -32,12 +33,22 @@ export function useHandTracking() {
   ) => {
     videoRef.current = video;
     debugCtxRef.current = debugCanvas.getContext('2d');
+    onResultsRef.current = onResults;
 
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: 640, height: 480 }
     });
     video.srcObject = stream;
-    await new Promise<void>(r => { video.onloadedmetadata = () => r(); });
+
+    // Wait for video metadata if not already loaded
+    if (video.readyState < 1) {
+      await new Promise<void>((resolve) => {
+        video.addEventListener('loadedmetadata', () => resolve(), { once: true });
+      });
+    }
+
+    // Explicitly play the video
+    await video.play();
 
     debugCanvas.width = 300;
     debugCanvas.height = 225;
@@ -55,7 +66,12 @@ export function useHandTracking() {
       minTrackingConfidence: 0.5
     });
 
-    handsRef.current.onResults(onResults);
+    // Use a stable wrapper that calls the latest callback from ref
+    handsRef.current.onResults((results) => {
+      if (onResultsRef.current) {
+        onResultsRef.current(results);
+      }
+    });
 
     const camera = new Camera(video, {
       onFrame: async () => {
@@ -367,6 +383,10 @@ export function useHandTracking() {
 
   const getRawHandData = useCallback(() => rawHandDataRef.current, []);
 
+  const updateResultsCallback = useCallback((callback: (results: Results) => void) => {
+    onResultsRef.current = callback;
+  }, []);
+
   return {
     cameraReady,
     leftHandActive,
@@ -380,6 +400,7 @@ export function useHandTracking() {
     processNormalFretting,
     processNormalStrumming,
     resetFrettedNotes,
-    getRawHandData
+    getRawHandData,
+    updateResultsCallback
   };
 }
