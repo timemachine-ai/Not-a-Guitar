@@ -40,7 +40,6 @@ function App() {
 
   // Refs
   const webcamRef = useRef<WebcamContainerRef>(null);
-  const initCompletedRef = useRef(false);
 
   // Hooks
   const {
@@ -96,7 +95,8 @@ function App() {
     processNormalFretting,
     processNormalStrumming,
     resetFrettedNotes,
-    getRawHandData
+    getRawHandData,
+    updateResultsCallback
   } = useHandTracking();
 
   // Handle strum callback
@@ -188,6 +188,11 @@ function App() {
     hideGhostHands
   ]);
 
+  // Keep the results callback updated when dependencies change
+  useEffect(() => {
+    updateResultsCallback(handleHandResults);
+  }, [handleHandResults, updateResultsCallback]);
+
   // Initialize Three.js
   const handleCanvasMount = useCallback((container: HTMLElement) => {
     initThree(container);
@@ -198,11 +203,12 @@ function App() {
 
   // Initialize application
   useEffect(() => {
-    if (initCompletedRef.current) return;
-    initCompletedRef.current = true;
+    let cancelled = false;
+    let checkInterval: number | undefined;
 
     const init = async () => {
       try {
+        if (cancelled) return;
         setLoadingText('Starting Camera');
         const video = webcamRef.current?.getVideo();
         const canvas = webcamRef.current?.getCanvas();
@@ -211,26 +217,34 @@ function App() {
           await initMediaPipe(video, canvas, handleHandResults);
         }
 
+        if (cancelled) return;
         setLoadingText('Ready');
         setTimeout(() => {
-          setLoading(false);
-          setShowInstructions(true);
+          if (!cancelled) {
+            setLoading(false);
+            setShowInstructions(true);
+          }
         }, 400);
       } catch (err) {
         console.error(err);
-        setLoadingText('Error: ' + (err as Error).message);
+        if (!cancelled) {
+          setLoadingText('Error: ' + (err as Error).message);
+        }
       }
     };
 
     // Wait for webcam ref to be ready
-    const checkRef = setInterval(() => {
+    checkInterval = window.setInterval(() => {
       if (webcamRef.current?.getVideo()) {
-        clearInterval(checkRef);
+        clearInterval(checkInterval);
         init();
       }
     }, 100);
 
-    return () => clearInterval(checkRef);
+    return () => {
+      cancelled = true;
+      if (checkInterval) clearInterval(checkInterval);
+    };
   }, [initMediaPipe, handleHandResults]);
 
   // Handle start button click
