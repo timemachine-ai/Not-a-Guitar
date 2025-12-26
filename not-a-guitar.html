@@ -1,0 +1,2102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Not a Guitar</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    
+    <style>
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-highlight: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.6);
+            --text-muted: rgba(255, 255, 255, 0.4);
+            --accent-cyan: #00d4ff;
+            --accent-pink: #ff0080;
+            --accent-green: #00ff88;
+            --accent-orange: #ff6b00;
+            --bg-dark: #0a0a0f;
+            --shadow-color: rgba(0, 0, 0, 0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Glassmorphism base */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 
+                0 8px 32px var(--shadow-color),
+                inset 0 1px 0 var(--glass-highlight);
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* Webcam */
+        #webcam-container {
+            position: fixed;
+            bottom: 24px;
+            left: 24px;
+            width: 300px;
+            height: 225px;
+            border-radius: 16px;
+            overflow: hidden;
+            z-index: 100;
+        }
+
+        #webcam-container video,
+        #webcam-container #debug-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #webcam-container.mirrored video,
+        #webcam-container.mirrored #debug-canvas {
+            transform: scaleX(-1);
+        }
+
+        #debug-canvas {
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        #webcam-label {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            font-family: 'Anton', sans-serif;
+            font-size: 11px;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            z-index: 3;
+        }
+
+        /* Header */
+        #header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: linear-gradient(to bottom, rgba(10, 10, 15, 0.9), transparent);
+        }
+
+        #logo {
+            font-family: 'Anton', sans-serif;
+            font-size: 28px;
+            letter-spacing: 2px;
+            color: var(--text-primary);
+            text-transform: uppercase;
+        }
+
+        #mode-badge {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            padding: 4px 12px;
+            background: var(--accent-pink);
+            color: white;
+            border-radius: 20px;
+            margin-left: 12px;
+            vertical-align: middle;
+            letter-spacing: 1px;
+        }
+
+        #status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 60, 60, 0.8);
+            transition: all 0.3s ease;
+        }
+
+        .status-dot.active {
+            background: var(--accent-green);
+            box-shadow: 0 0 12px var(--accent-green);
+        }
+
+        /* Mode Switcher */
+        #mode-switcher {
+            position: fixed;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            padding: 4px;
+            border-radius: 30px;
+            z-index: 100;
+        }
+
+        .mode-btn {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 10px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-radius: 26px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .mode-btn:hover {
+            color: var(--text-secondary);
+        }
+
+        .mode-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        /* Guitar Selector */
+        #guitar-selector {
+            position: fixed;
+            top: 125px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        .guitar-type-btn {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 500;
+            padding: 8px 16px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .guitar-type-btn:hover {
+            border-color: var(--glass-highlight);
+            color: var(--text-primary);
+        }
+
+        .guitar-type-btn.active {
+            border-color: var(--accent-orange);
+            color: var(--accent-orange);
+            background: rgba(255, 107, 0, 0.1);
+        }
+
+        /* Settings Toggle */
+        #settings-toggle {
+            position: fixed;
+            right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            cursor: pointer;
+            z-index: 200;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s ease;
+        }
+
+        #settings-toggle:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--glass-highlight);
+        }
+
+        #settings-toggle svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        #settings-toggle:hover svg {
+            fill: var(--text-primary);
+        }
+
+        /* Settings Sidebar */
+        #settings-sidebar {
+            position: fixed;
+            right: -400px;
+            top: 0;
+            width: 380px;
+            height: 100%;
+            z-index: 150;
+            padding: 80px 24px 24px;
+            overflow-y: auto;
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(15, 15, 20, 0.95);
+            backdrop-filter: blur(30px);
+            border-left: 1px solid var(--glass-border);
+        }
+
+        #settings-sidebar.open { right: 0; }
+
+        #settings-sidebar::-webkit-scrollbar { width: 4px; }
+        #settings-sidebar::-webkit-scrollbar-thumb { 
+            background: var(--glass-highlight); 
+            border-radius: 2px; 
+        }
+
+        .settings-section { margin-bottom: 28px; }
+
+        .settings-section h3 {
+            font-family: 'Anton', sans-serif;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .setting-row { margin-bottom: 16px; }
+
+        .setting-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .setting-value {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            color: var(--accent-cyan);
+            font-size: 12px;
+        }
+
+        /* Custom Range Slider */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s ease;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-switch.active {
+            background: var(--accent-cyan);
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            transition: left 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle-switch.active::after { left: 22px; }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 8px;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--glass-highlight);
+            color: var(--text-primary);
+        }
+
+        .btn.primary {
+            background: var(--accent-cyan);
+            border: none;
+            color: #000;
+        }
+
+        .btn.primary:hover {
+            background: #00e5ff;
+        }
+
+        /* Auto Tuner - Hidden by default */
+        #auto-tuner {
+            position: fixed;
+            bottom: 24px;
+            right: 90px;
+            width: 200px;
+            border-radius: 16px;
+            padding: 16px;
+            z-index: 100;
+            display: none;
+        }
+
+        #auto-tuner.visible { display: block; }
+
+        #auto-tuner h4 {
+            font-family: 'Anton', sans-serif;
+            font-size: 12px;
+            color: var(--accent-green);
+            text-align: center;
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        #tuner-display { text-align: center; margin-bottom: 8px; }
+
+        #detected-note {
+            font-family: 'Anton', sans-serif;
+            font-size: 42px;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+
+        #detected-octave { 
+            font-family: 'Inter', sans-serif;
+            font-size: 18px; 
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+
+        #detected-freq { 
+            font-size: 11px; 
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        #tuner-meter {
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            position: relative;
+            margin: 12px 0;
+        }
+
+        #tuner-meter::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: -4px;
+            bottom: -4px;
+            width: 2px;
+            background: var(--accent-green);
+            transform: translateX(-50%);
+            border-radius: 1px;
+        }
+
+        #tuner-needle {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            background: var(--accent-pink);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            transition: left 0.15s ease;
+            box-shadow: 0 0 12px var(--accent-pink);
+        }
+
+        #tuner-needle.in-tune {
+            background: var(--accent-green);
+            box-shadow: 0 0 16px var(--accent-green);
+        }
+
+        #cents-display {
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        #tuner-status { 
+            font-size: 10px; 
+            text-align: center; 
+            color: var(--text-muted); 
+            margin-top: 6px;
+        }
+
+        #tuner-btn { margin-top: 10px; padding: 10px; }
+
+        /* Tuning Knobs */
+        #tuning-panel {
+            position: fixed;
+            top: 175px;
+            right: 90px;
+            padding: 16px;
+            border-radius: 16px;
+            z-index: 100;
+            display: none;
+        }
+
+        #tuning-panel.visible { display: block; }
+
+        #tuning-panel h4 {
+            font-family: 'Anton', sans-serif;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 12px;
+            letter-spacing: 2px;
+        }
+
+        .tuning-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .tuning-label {
+            font-family: 'Anton', sans-serif;
+            font-size: 12px;
+            width: 24px;
+            color: var(--text-primary);
+        }
+
+        .tuning-knob {
+            width: 28px;
+            height: 28px;
+            background: linear-gradient(145deg, #3a3a3a, #1a1a1a);
+            border-radius: 50%;
+            border: 2px solid #444;
+            cursor: grab;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .tuning-knob::before {
+            content: '';
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 2px;
+            height: 6px;
+            background: var(--accent-orange);
+            border-radius: 1px;
+        }
+
+        .tuning-freq {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--accent-green);
+            width: 50px;
+        }
+
+        /* Note Display */
+        #note-display {
+            position: fixed;
+            bottom: 260px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+        }
+
+        .note-badge {
+            font-family: 'Anton', sans-serif;
+            font-size: 36px;
+            padding: 16px 40px;
+            border-radius: 16px;
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.15s ease;
+            letter-spacing: 2px;
+        }
+
+        .note-badge.active {
+            opacity: 1;
+            transform: scale(1);
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+        }
+
+        /* String Indicators */
+        #string-indicators {
+            position: fixed;
+            left: 344px;
+            bottom: 32px;
+            display: flex;
+            gap: 14px;
+            z-index: 100;
+        }
+
+        .string-indicator {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            opacity: 0.4;
+            transition: all 0.15s ease;
+        }
+
+        .string-indicator.active {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+
+        .string-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            background: transparent;
+            transition: all 0.15s ease;
+        }
+
+        .string-indicator.active .string-dot {
+            background: currentColor;
+            box-shadow: 0 0 16px currentColor;
+        }
+
+        .string-name {
+            font-family: 'Inter', sans-serif;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        /* Debug Panel */
+        #hand-debug {
+            position: fixed;
+            top: 175px;
+            left: 24px;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 11px;
+            z-index: 100;
+            min-width: 160px;
+        }
+
+        #hand-debug h5 {
+            font-family: 'Anton', sans-serif;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            font-size: 11px;
+            letter-spacing: 2px;
+        }
+
+        .debug-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .debug-value { 
+            color: var(--accent-cyan);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+        }
+
+        /* Instructions Modal */
+        #instructions-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #instructions-modal.hidden { display: none; }
+
+        .modal-content {
+            max-width: 500px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .modal-content h2 {
+            font-family: 'Anton', sans-serif;
+            font-size: 48px;
+            margin-bottom: 24px;
+            color: var(--text-primary);
+            letter-spacing: 3px;
+        }
+
+        .modal-content p {
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-weight: 400;
+        }
+
+        .modal-content .highlight {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .modal-content .btn {
+            margin-top: 24px;
+            display: inline-block;
+            width: auto;
+            padding: 14px 48px;
+        }
+
+        /* Loading */
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-dark);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #loading-screen.hidden { display: none; }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 2px solid transparent;
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #loading-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 3px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loader"></div>
+        <div id="loading-text">Loading</div>
+    </div>
+
+    <div id="instructions-modal" class="hidden">
+        <div class="modal-content">
+            <h2>NOT A GUITAR</h2>
+            <p><span class="highlight">Normal Mode</span> — Vertical fretboard, strum with right hand</p>
+            <p><span class="highlight">Pro Mode</span> — Horizontal guitar, left hand frets, right hand strums</p>
+            <p>Adjust the zone sliders to calibrate for your distance from camera</p>
+            <button class="btn primary" id="start-btn">Start Playing</button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <div id="webcam-container" class="glass mirrored">
+        <span id="webcam-label">Tracking</span>
+        <video id="webcam" autoplay playsinline></video>
+        <canvas id="debug-canvas"></canvas>
+    </div>
+
+    <div id="header">
+        <div>
+            <span id="logo">Not a Guitar</span>
+            <span id="mode-badge">NORMAL</span>
+        </div>
+        <div id="status-bar">
+            <div class="status-indicator">
+                <span class="status-dot" id="camera-status"></span>
+                <span>Cam</span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot" id="left-hand-status"></span>
+                <span>Left</span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot" id="right-hand-status"></span>
+                <span>Right</span>
+            </div>
+            <div class="status-indicator">
+                <span class="status-dot" id="audio-status"></span>
+                <span>Audio</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="mode-switcher" class="glass">
+        <button class="mode-btn active" data-mode="normal">Normal</button>
+        <button class="mode-btn" data-mode="pro">Pro Mode</button>
+    </div>
+
+    <div id="guitar-selector">
+        <button class="guitar-type-btn active" data-type="acoustic">Acoustic</button>
+        <button class="guitar-type-btn" data-type="electric">Electric</button>
+        <button class="guitar-type-btn" data-type="classical">Classical</button>
+        <button class="guitar-type-btn" data-type="bass">Bass</button>
+    </div>
+
+    <div id="hand-debug" class="glass">
+        <h5>DEBUG</h5>
+        <div class="debug-row"><span>Left X</span><span class="debug-value" id="dbg-lx">—</span></div>
+        <div class="debug-row"><span>Left Y</span><span class="debug-value" id="dbg-ly">—</span></div>
+        <div class="debug-row"><span>Right X</span><span class="debug-value" id="dbg-rx">—</span></div>
+        <div class="debug-row"><span>Right Y</span><span class="debug-value" id="dbg-ry">—</span></div>
+        <div class="debug-row"><span>String</span><span class="debug-value" id="dbg-string">—</span></div>
+        <div class="debug-row"><span>Fret</span><span class="debug-value" id="dbg-fret">—</span></div>
+    </div>
+
+    <div id="tuning-panel" class="glass">
+        <h4>Tuning</h4>
+    </div>
+
+    <div id="auto-tuner" class="glass">
+        <h4>Auto Tuner</h4>
+        <div id="tuner-display">
+            <span id="detected-note">—</span><span id="detected-octave"></span>
+            <div id="detected-freq">— Hz</div>
+        </div>
+        <div id="tuner-meter">
+            <div id="tuner-needle"></div>
+        </div>
+        <div id="cents-display">0 cents</div>
+        <div id="tuner-status">Click to start</div>
+        <button class="btn" id="tuner-btn">Start Tuner</button>
+    </div>
+
+    <div id="string-indicators"></div>
+
+    <div id="note-display">
+        <div class="note-badge glass" id="current-note"></div>
+    </div>
+
+    <button id="settings-toggle" class="glass">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    </button>
+
+    <div id="settings-sidebar">
+        <div class="settings-section">
+            <h3>Zone Calibration</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Zone Size</span>
+                    <span class="setting-value" id="zone-size-value">70%</span>
+                </div>
+                <input type="range" id="zone-size" min="30" max="100" step="5" value="70">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Zone X Offset</span>
+                    <span class="setting-value" id="zone-x-value">0%</span>
+                </div>
+                <input type="range" id="zone-x-offset" min="-30" max="30" step="2" value="0">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Zone Y Offset</span>
+                    <span class="setting-value" id="zone-y-value">10%</span>
+                </div>
+                <input type="range" id="zone-y-offset" min="0" max="40" step="2" value="10">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>String Width</span>
+                    <span class="setting-value" id="string-width-value">0.14</span>
+                </div>
+                <input type="range" id="string-width" min="0.08" max="0.25" step="0.01" value="0.14">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Strum Sensitivity</span>
+                    <span class="setting-value" id="strum-sens-value">0.012</span>
+                </div>
+                <input type="range" id="strum-sensitivity" min="0.005" max="0.03" step="0.001" value="0.012">
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Audio</h3>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Volume</span>
+                    <span class="setting-value" id="volume-value">80%</span>
+                </div>
+                <input type="range" id="volume" min="0" max="100" step="5" value="80">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Reverb</span>
+                    <span class="setting-value" id="reverb-value">25%</span>
+                </div>
+                <input type="range" id="reverb" min="0" max="100" step="5" value="25">
+            </div>
+            <div class="toggle-container">
+                <span>Distortion</span>
+                <div class="toggle-switch" id="distortion-toggle"></div>
+            </div>
+            <div class="toggle-container">
+                <span>Sustain</span>
+                <div class="toggle-switch active" id="sustain-toggle"></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Display</h3>
+            <div class="toggle-container">
+                <span>Mirror Camera</span>
+                <div class="toggle-switch active" id="mirror-toggle"></div>
+            </div>
+            <div class="toggle-container">
+                <span>Ghost Hands</span>
+                <div class="toggle-switch active" id="ghost-toggle"></div>
+            </div>
+            <div class="toggle-container">
+                <span>Debug Overlay</span>
+                <div class="toggle-switch active" id="debug-toggle"></div>
+            </div>
+            <div class="toggle-container">
+                <span>Auto Tuner</span>
+                <div class="toggle-switch" id="tuner-toggle"></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h3>Tools</h3>
+            <button class="btn" id="reset-btn">Reset to Defaults</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== CONFIG ====================
+        const CONFIG = {
+            mode: 'normal',
+            guitarType: 'acoustic',
+            strings: 6,
+            frets: 12,
+            
+            zoneSize: 0.70,
+            zoneXOffset: 0.00,
+            zoneYOffset: 0.10,
+            
+            stringDetectionWidth: 0.14,
+            strumSensitivity: 0.012,
+            
+            volume: 0.8,
+            reverb: 0.25,
+            distortion: false,
+            sustain: true,
+            
+            mirrorCamera: true,
+            showGhostHands: true,
+            showDebug: true,
+            showTuner: false,
+            
+            // String colors: index 0 = LOW E (thickest), index 5 = HIGH E (thinnest)
+            // Visual order top-to-bottom: LOW E first (purple) to HIGH E last (pink)
+            stringColors: [
+                0xaa00ff, // E2 (low) - Purple
+                0x00ffff, // A2 - Cyan
+                0x00ff88, // D3 - Green
+                0xffff00, // G3 - Yellow
+                0xff6600, // B3 - Orange
+                0xff0066  // E4 (high) - Pink
+            ],
+            
+            tuning: {
+                standard: [
+                    { note: 'E2', freq: 82.41 },
+                    { note: 'A2', freq: 110.00 },
+                    { note: 'D3', freq: 146.83 },
+                    { note: 'G3', freq: 196.00 },
+                    { note: 'B3', freq: 246.94 },
+                    { note: 'E4', freq: 329.63 }
+                ],
+                bass: [
+                    { note: 'E1', freq: 41.20 },
+                    { note: 'A1', freq: 55.00 },
+                    { note: 'D2', freq: 73.42 },
+                    { note: 'G2', freq: 98.00 }
+                ]
+            }
+        };
+
+        const GUITAR_TYPES = {
+            acoustic: { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.4, sustain: 0.3, release: 1.5 }, filterFreq: 2000, strings: 6, tuning: 'standard' },
+            electric: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.5, release: 0.8 }, filterFreq: 4000, strings: 6, tuning: 'standard' },
+            classical: { oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.4, release: 2.0 }, filterFreq: 1500, strings: 6, tuning: 'standard' },
+            bass: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 1.0 }, filterFreq: 800, strings: 4, tuning: 'bass' }
+        };
+
+        let currentTuning = [...CONFIG.tuning.standard];
+        let frettedNotes = {};
+        let lastStrumPos = {};
+        let strumCooldown = {};
+
+        // ==================== THREE.JS ====================
+        let scene, camera, renderer;
+        let strings3D = [], stringGlows = [], frets3D = [];
+        let ghostLeft = [], ghostRight = [];
+        let fretboard, guitarBody, soundHole;
+
+        function initThree() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x08080c);
+            scene.fog = new THREE.Fog(0x08080c, 20, 50);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+            setCameraForMode();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            scene.add(new THREE.AmbientLight(0x404060, 0.8));
+            
+            const light1 = new THREE.PointLight(0x00d4ff, 0.5, 30);
+            light1.position.set(-12, 8, 15);
+            scene.add(light1);
+            
+            const light2 = new THREE.PointLight(0xff0080, 0.5, 30);
+            light2.position.set(12, -8, 15);
+            scene.add(light2);
+
+            const light3 = new THREE.DirectionalLight(0xffffff, 0.3);
+            light3.position.set(0, 10, 10);
+            scene.add(light3);
+
+            createGuitar();
+            createGhostHands();
+            createBackground();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        function setCameraForMode() {
+            if (CONFIG.mode === 'pro') {
+                camera.position.set(0, 0, 18);
+                camera.lookAt(0, 0, 0);
+            } else {
+                camera.position.set(0, -2, 16);
+                camera.lookAt(0, 2, 0);
+            }
+        }
+
+        function createBackground() {
+            const grid = new THREE.GridHelper(60, 60, 0x1a1a2e, 0x0a0a12);
+            grid.rotation.x = Math.PI / 2;
+            grid.position.z = -3;
+            scene.add(grid);
+        }
+
+        function createGuitar() {
+            [fretboard, guitarBody, soundHole].forEach(obj => { if(obj) scene.remove(obj); });
+            strings3D.forEach(s => scene.remove(s));
+            stringGlows.forEach(g => scene.remove(g));
+            frets3D.forEach(f => scene.remove(f));
+            strings3D = []; stringGlows = []; frets3D = [];
+
+            const gc = GUITAR_TYPES[CONFIG.guitarType];
+            const numStrings = gc.strings;
+            currentTuning = [...CONFIG.tuning[gc.tuning]];
+
+            if (CONFIG.mode === 'pro') {
+                createHorizontalGuitar(numStrings);
+            } else {
+                createVerticalGuitar(numStrings);
+            }
+
+            updateStringIndicators(numStrings);
+        }
+
+        function createVerticalGuitar(numStrings) {
+            const fbWidth = 6, fbLength = 14;
+
+            const fbGeom = new THREE.BoxGeometry(fbWidth, fbLength, 0.25);
+            const fbMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, emissive: 0x080808 });
+            fretboard = new THREE.Mesh(fbGeom, fbMat);
+            fretboard.position.set(0, 0, -0.15);
+            scene.add(fretboard);
+
+            const stringSpacing = fbWidth / (numStrings + 1);
+
+            // Strings: index 0 at LEFT (low E / purple), index 5 at RIGHT (high E / pink)
+            for (let i = 0; i < numStrings; i++) {
+                const x = -fbWidth / 2 + stringSpacing * (i + 1);
+                const color = CONFIG.stringColors[i];
+                const thickness = 0.022 - i * 0.002;
+
+                const sGeom = new THREE.CylinderGeometry(thickness, thickness, fbLength, 8);
+                const sMat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+                const string = new THREE.Mesh(sGeom, sMat);
+                string.position.set(x, 0, 0.1);
+                scene.add(string);
+                strings3D.push(string);
+
+                const gGeom = new THREE.CylinderGeometry(0.08, 0.08, fbLength, 8);
+                const gMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+                const glow = new THREE.Mesh(gGeom, gMat);
+                glow.position.copy(string.position);
+                scene.add(glow);
+                stringGlows.push(glow);
+            }
+
+            const fretSpacing = fbLength / (CONFIG.frets + 1);
+            for (let i = 0; i < CONFIG.frets; i++) {
+                const y = -fbLength / 2 + fretSpacing * (i + 1);
+                const fGeom = new THREE.BoxGeometry(fbWidth - 0.4, 0.06, 0.08);
+                const fMat = new THREE.MeshPhongMaterial({ color: 0x888888, emissive: 0x222222 });
+                const fret = new THREE.Mesh(fGeom, fMat);
+                fret.position.set(0, y, 0.1);
+                scene.add(fret);
+                frets3D.push(fret);
+            }
+        }
+
+        function createHorizontalGuitar(numStrings) {
+            const neckLength = 16, neckWidth = 5;
+
+            const neckGeom = new THREE.BoxGeometry(neckLength, neckWidth, 0.2);
+            const neckMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, emissive: 0x080808 });
+            fretboard = new THREE.Mesh(neckGeom, neckMat);
+            fretboard.position.set(-2, 0, -0.12);
+            scene.add(fretboard);
+
+            const bodyGeom = new THREE.CircleGeometry(4, 48);
+            const bodyMat = new THREE.MeshPhongMaterial({ color: 0x2a2a2a, emissive: 0x0a0a0a });
+            guitarBody = new THREE.Mesh(bodyGeom, bodyMat);
+            guitarBody.position.set(neckLength / 2 + 1.5, 0, -0.08);
+            scene.add(guitarBody);
+
+            const holeGeom = new THREE.RingGeometry(1.0, 1.3, 48);
+            const holeMat = new THREE.MeshBasicMaterial({ color: 0x050505, side: THREE.DoubleSide });
+            soundHole = new THREE.Mesh(holeGeom, holeMat);
+            soundHole.position.set(neckLength / 2 + 1.5, 0, 0.01);
+            scene.add(soundHole);
+
+            const stringSpacing = neckWidth / (numStrings + 1);
+            const stringLength = neckLength + 8;
+
+            // Strings: index 0 at TOP (low E / purple), index 5 at BOTTOM (high E / pink)
+            for (let i = 0; i < numStrings; i++) {
+                const y = neckWidth / 2 - stringSpacing * (i + 1);
+                const color = CONFIG.stringColors[i];
+                const thickness = 0.022 - i * 0.002;
+
+                const sGeom = new THREE.CylinderGeometry(thickness, thickness, stringLength, 8);
+                const sMat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
+                const string = new THREE.Mesh(sGeom, sMat);
+                string.rotation.z = Math.PI / 2;
+                string.position.set(2, y, 0.1);
+                scene.add(string);
+                strings3D.push(string);
+
+                const gGeom = new THREE.CylinderGeometry(0.08, 0.08, stringLength, 8);
+                const gMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
+                const glow = new THREE.Mesh(gGeom, gMat);
+                glow.rotation.z = Math.PI / 2;
+                glow.position.copy(string.position);
+                scene.add(glow);
+                stringGlows.push(glow);
+            }
+
+            const fretSpacing = neckLength / (CONFIG.frets + 1);
+            for (let i = 0; i < CONFIG.frets; i++) {
+                const x = -neckLength / 2 - 2 + fretSpacing * (i + 1);
+                const fGeom = new THREE.BoxGeometry(0.06, neckWidth - 0.3, 0.08);
+                const fMat = new THREE.MeshPhongMaterial({ color: 0x888888, emissive: 0x222222 });
+                const fret = new THREE.Mesh(fGeom, fMat);
+                fret.position.set(x, 0, 0.1);
+                scene.add(fret);
+                frets3D.push(fret);
+            }
+        }
+
+        function createGhostHands() {
+            ghostLeft.forEach(s => scene.remove(s));
+            ghostRight.forEach(s => scene.remove(s));
+            ghostLeft = []; ghostRight = [];
+
+            for (let i = 0; i < 21; i++) {
+                const isTip = [4, 8, 12, 16, 20].includes(i);
+                const size = isTip ? 0.14 : 0.07;
+
+                const leftGeom = new THREE.SphereGeometry(size, 12, 12);
+                const leftMat = new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.7 });
+                const left = new THREE.Mesh(leftGeom, leftMat);
+                left.visible = false;
+                scene.add(left);
+                ghostLeft.push(left);
+
+                const rightGeom = new THREE.SphereGeometry(size, 12, 12);
+                const rightMat = new THREE.MeshBasicMaterial({ color: 0xff0080, transparent: true, opacity: 0.7 });
+                const right = new THREE.Mesh(rightGeom, rightMat);
+                right.visible = false;
+                scene.add(right);
+                ghostRight.push(right);
+            }
+        }
+
+        function updateStringIndicators(numStrings) {
+            const container = document.getElementById('string-indicators');
+            container.innerHTML = '';
+
+            // Display order: LOW E (purple) on left, HIGH E (pink) on right
+            for (let i = 0; i < numStrings; i++) {
+                const color = CONFIG.stringColors[i];
+                const note = currentTuning[i]?.note || '';
+                const div = document.createElement('div');
+                div.className = 'string-indicator';
+                div.style.color = '#' + color.toString(16).padStart(6, '0');
+                div.innerHTML = `
+                    <div class="string-dot"></div>
+                    <span class="string-name">${note}</span>
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        function triggerStringGlow(idx) {
+            if (stringGlows[idx]) {
+                stringGlows[idx].material.opacity = 1;
+                strings3D[idx].material.emissiveIntensity = 1;
+            }
+
+            const indicators = document.querySelectorAll('.string-indicator');
+            if (indicators[idx]) {
+                indicators[idx].classList.add('active');
+                setTimeout(() => indicators[idx].classList.remove('active'), 200);
+            }
+        }
+
+        // ==================== TONE.JS ====================
+        let synth, reverb, distortion, filter;
+        let audioReady = false;
+
+        async function initAudio() {
+            await Tone.start();
+            setupSynth();
+            audioReady = true;
+            document.getElementById('audio-status').classList.add('active');
+        }
+
+        function setupSynth() {
+            if (synth) synth.dispose();
+            if (reverb) reverb.dispose();
+            if (distortion) distortion.dispose();
+            if (filter) filter.dispose();
+
+            const gc = GUITAR_TYPES[CONFIG.guitarType];
+
+            synth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: gc.oscillator,
+                envelope: {
+                    ...gc.envelope,
+                    release: CONFIG.sustain ? gc.envelope.release * 1.5 : gc.envelope.release * 0.4
+                }
+            });
+
+            filter = new Tone.Filter(gc.filterFreq, 'lowpass');
+            distortion = new Tone.Distortion({ distortion: 0.5, wet: CONFIG.distortion ? 0.4 : 0 });
+            reverb = new Tone.Reverb({ decay: 2, wet: CONFIG.reverb });
+
+            synth.chain(filter, distortion, reverb, Tone.Destination);
+            synth.volume.value = Tone.gainToDb(CONFIG.volume);
+        }
+
+        function playNote(note, velocity = 0.8) {
+            if (!audioReady) return;
+            synth.triggerAttackRelease(note, CONFIG.sustain ? '2n' : '8n', undefined, velocity);
+
+            document.getElementById('current-note').textContent = note;
+            document.getElementById('current-note').classList.add('active');
+            setTimeout(() => document.getElementById('current-note').classList.remove('active'), 300);
+        }
+
+        function getNoteAtFret(stringIdx, fretNum) {
+            if (!currentTuning[stringIdx]) return 'C4';
+
+            const base = currentTuning[stringIdx].note;
+            const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+            const basePitch = base.slice(0, -1);
+            const baseOctave = parseInt(base.slice(-1));
+            const baseIdx = notes.indexOf(basePitch);
+
+            const newIdx = (baseIdx + fretNum) % 12;
+            const octaveUp = Math.floor((baseIdx + fretNum) / 12);
+
+            return notes[newIdx] + (baseOctave + octaveUp);
+        }
+
+        // ==================== AUTO TUNER ====================
+        let tunerRunning = false;
+        let audioCtx, analyser, micStream, dataArray;
+
+        async function startTuner() {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 8192;
+                analyser.smoothingTimeConstant = 0.8;
+                
+                dataArray = new Float32Array(analyser.fftSize);
+
+                micStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: false,
+                        noiseSuppression: false,
+                        autoGainControl: false
+                    } 
+                });
+                
+                const source = audioCtx.createMediaStreamSource(micStream);
+                source.connect(analyser);
+
+                tunerRunning = true;
+                document.getElementById('tuner-btn').textContent = 'Stop Tuner';
+                document.getElementById('tuner-status').textContent = 'Listening...';
+
+                runTuner();
+            } catch (e) {
+                console.error('Tuner error:', e);
+                document.getElementById('tuner-status').textContent = 'Mic access denied';
+            }
+        }
+
+        function stopTuner() {
+            tunerRunning = false;
+            if (micStream) micStream.getTracks().forEach(t => t.stop());
+            if (audioCtx && audioCtx.state !== 'closed') audioCtx.close();
+
+            document.getElementById('tuner-btn').textContent = 'Start Tuner';
+            document.getElementById('tuner-status').textContent = 'Click to start';
+            document.getElementById('detected-note').textContent = '—';
+            document.getElementById('detected-octave').textContent = '';
+            document.getElementById('detected-freq').textContent = '— Hz';
+            document.getElementById('cents-display').textContent = '0 cents';
+            document.getElementById('tuner-needle').style.left = '50%';
+        }
+
+        function runTuner() {
+            if (!tunerRunning) return;
+
+            analyser.getFloatTimeDomainData(dataArray);
+            const freq = detectPitchACF(dataArray, audioCtx.sampleRate);
+
+            if (freq > 50 && freq < 1000) {
+                const info = freqToNote(freq);
+
+                document.getElementById('detected-note').textContent = info.note;
+                document.getElementById('detected-octave').textContent = info.octave;
+                document.getElementById('detected-freq').textContent = freq.toFixed(1) + ' Hz';
+
+                const cents = info.cents;
+                const centsText = (cents >= 0 ? '+' : '') + cents.toFixed(0);
+                document.getElementById('cents-display').textContent = centsText + ' cents';
+
+                // Needle: -50 cents = 0%, 0 cents = 50%, +50 cents = 100%
+                const needlePos = 50 + cents;
+                const needle = document.getElementById('tuner-needle');
+                needle.style.left = Math.max(5, Math.min(95, needlePos)) + '%';
+
+                if (Math.abs(cents) < 5) {
+                    needle.classList.add('in-tune');
+                    document.getElementById('cents-display').style.color = 'var(--accent-green)';
+                } else {
+                    needle.classList.remove('in-tune');
+                    document.getElementById('cents-display').style.color = 'var(--text-secondary)';
+                }
+            }
+
+            requestAnimationFrame(runTuner);
+        }
+
+        function detectPitchACF(buffer, sampleRate) {
+            // Check RMS
+            let rms = 0;
+            for (let i = 0; i < buffer.length; i++) rms += buffer[i] * buffer[i];
+            rms = Math.sqrt(rms / buffer.length);
+            if (rms < 0.01) return -1;
+
+            // Autocorrelation
+            const size = buffer.length;
+            const halfSize = Math.floor(size / 2);
+            let bestLag = -1;
+            let bestCorr = 0;
+            
+            // Search in frequency range ~50Hz to ~1000Hz
+            const minLag = Math.floor(sampleRate / 1000);
+            const maxLag = Math.floor(sampleRate / 50);
+
+            for (let lag = minLag; lag < Math.min(maxLag, halfSize); lag++) {
+                let corr = 0;
+                let norm1 = 0;
+                let norm2 = 0;
+                
+                for (let i = 0; i < halfSize; i++) {
+                    corr += buffer[i] * buffer[i + lag];
+                    norm1 += buffer[i] * buffer[i];
+                    norm2 += buffer[i + lag] * buffer[i + lag];
+                }
+                
+                // Normalized correlation
+                const normCorr = corr / Math.sqrt(norm1 * norm2 + 0.0001);
+                
+                if (normCorr > bestCorr && normCorr > 0.5) {
+                    bestCorr = normCorr;
+                    bestLag = lag;
+                }
+            }
+
+            if (bestLag === -1) return -1;
+            
+            // Parabolic interpolation for better accuracy
+            if (bestLag > 0 && bestLag < halfSize - 1) {
+                const y0 = getCorrelation(buffer, bestLag - 1, halfSize);
+                const y1 = getCorrelation(buffer, bestLag, halfSize);
+                const y2 = getCorrelation(buffer, bestLag + 1, halfSize);
+                const shift = (y2 - y0) / (2 * (2 * y1 - y0 - y2));
+                bestLag += shift;
+            }
+
+            return sampleRate / bestLag;
+        }
+
+        function getCorrelation(buffer, lag, size) {
+            let corr = 0;
+            for (let i = 0; i < size; i++) {
+                corr += buffer[i] * buffer[i + lag];
+            }
+            return corr;
+        }
+
+        function freqToNote(freq) {
+            const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+            const A4 = 440;
+            const semitones = 12 * Math.log2(freq / A4);
+            const rounded = Math.round(semitones);
+            const cents = (semitones - rounded) * 100;
+
+            const noteIdx = ((rounded % 12) + 12 + 9) % 12;
+            const octave = Math.floor((rounded + 9) / 12) + 4;
+
+            return { note: notes[noteIdx], octave, cents };
+        }
+
+        // ==================== MEDIAPIPE ====================
+        let hands;
+        let debugCtx;
+        let rawHandData = { left: null, right: null };
+
+        async function initMediaPipe() {
+            const video = document.getElementById('webcam');
+            const debugCanvas = document.getElementById('debug-canvas');
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+            video.srcObject = stream;
+            await new Promise(r => video.onloadedmetadata = r);
+
+            debugCanvas.width = 300;
+            debugCanvas.height = 225;
+            debugCtx = debugCanvas.getContext('2d');
+
+            document.getElementById('camera-status').classList.add('active');
+
+            hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+            hands.onResults(onHandResults);
+
+            const cam = new Camera(video, {
+                onFrame: async () => await hands.send({ image: video }),
+                width: 640, height: 480
+            });
+            cam.start();
+        }
+
+        function getZoneBounds() {
+            const margin = (1 - CONFIG.zoneSize) / 2;
+            return {
+                left: margin + CONFIG.zoneXOffset,
+                right: 1 - margin + CONFIG.zoneXOffset,
+                top: CONFIG.zoneYOffset,
+                bottom: CONFIG.zoneYOffset + CONFIG.zoneSize
+            };
+        }
+
+        function onHandResults(results) {
+            debugCtx.clearRect(0, 0, 300, 225);
+
+            const leftStatus = document.getElementById('left-hand-status');
+            const rightStatus = document.getElementById('right-hand-status');
+            leftStatus.classList.remove('active');
+            rightStatus.classList.remove('active');
+            rawHandData = { left: null, right: null };
+
+            ghostLeft.forEach(s => s.visible = false);
+            ghostRight.forEach(s => s.visible = false);
+
+            if (CONFIG.showDebug) drawZones();
+
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) return;
+
+            results.multiHandLandmarks.forEach((landmarks, i) => {
+                const label = results.multiHandedness[i].label;
+                const isUserLeft = CONFIG.mirrorCamera ? label === 'Right' : label === 'Left';
+
+                if (isUserLeft) {
+                    leftStatus.classList.add('active');
+                    rawHandData.left = landmarks;
+                    processHand(landmarks, true);
+                    if (CONFIG.showDebug) drawHandLandmarks(landmarks, '#00d4ff');
+                } else {
+                    rightStatus.classList.add('active');
+                    rawHandData.right = landmarks;
+                    processHand(landmarks, false);
+                    if (CONFIG.showDebug) drawHandLandmarks(landmarks, '#ff0080');
+                }
+            });
+
+            updateDebugPanel();
+        }
+
+        function drawZones() {
+            const bounds = getZoneBounds();
+            const w = 300, h = 225;
+            const numStrings = strings3D.length;
+
+            const zoneLeft = bounds.left * w;
+            const zoneTop = bounds.top * h;
+            const zoneWidth = (bounds.right - bounds.left) * w;
+            const zoneHeight = (bounds.bottom - bounds.top) * h;
+
+            debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            debugCtx.lineWidth = 1;
+            debugCtx.setLineDash([4, 4]);
+            debugCtx.strokeRect(zoneLeft, zoneTop, zoneWidth, zoneHeight);
+            debugCtx.setLineDash([]);
+
+            if (CONFIG.mode === 'pro') {
+                const midX = zoneLeft + zoneWidth / 2;
+
+                debugCtx.fillStyle = 'rgba(0, 212, 255, 0.6)';
+                debugCtx.font = '600 9px Inter';
+                debugCtx.fillText('FRET', zoneLeft + 8, zoneTop + 14);
+
+                debugCtx.fillStyle = 'rgba(255, 0, 128, 0.6)';
+                debugCtx.fillText('STRUM', midX + 8, zoneTop + 14);
+
+                debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                debugCtx.beginPath();
+                debugCtx.moveTo(midX, zoneTop);
+                debugCtx.lineTo(midX, zoneTop + zoneHeight);
+                debugCtx.stroke();
+
+                // Strings in strum zone - TOP is low E (purple), BOTTOM is high E (pink)
+                const strumZoneTop = zoneTop + 18;
+                const strumZoneHeight = zoneHeight - 22;
+                const stringSpacing = strumZoneHeight / numStrings;
+
+                for (let i = 0; i < numStrings; i++) {
+                    const y = strumZoneTop + stringSpacing * (i + 0.5);
+                    const color = CONFIG.stringColors[i];
+
+                    debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+                    debugCtx.lineWidth = 2;
+                    debugCtx.beginPath();
+                    debugCtx.moveTo(midX + 5, y);
+                    debugCtx.lineTo(zoneLeft + zoneWidth - 5, y);
+                    debugCtx.stroke();
+
+                    debugCtx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                    debugCtx.font = '600 8px Inter';
+                    debugCtx.fillText(currentTuning[i]?.note || '', zoneLeft + zoneWidth - 22, y + 3);
+                }
+            } else {
+                // Normal mode - LEFT is low E (purple), RIGHT is high E (pink)
+                const stringSpacing = zoneWidth / numStrings;
+
+                for (let i = 0; i < numStrings; i++) {
+                    const x = zoneLeft + stringSpacing * (i + 0.5);
+                    const color = CONFIG.stringColors[i];
+
+                    debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+                    debugCtx.lineWidth = 2;
+                    debugCtx.beginPath();
+                    debugCtx.moveTo(x, zoneTop + 12);
+                    debugCtx.lineTo(x, zoneTop + zoneHeight - 5);
+                    debugCtx.stroke();
+                }
+            }
+        }
+
+        function drawHandLandmarks(landmarks, color) {
+            debugCtx.fillStyle = color;
+
+            landmarks.forEach((lm, i) => {
+                const x = lm.x * 300;
+                const y = lm.y * 225;
+                const isTip = [4, 8, 12, 16, 20].includes(i);
+                const size = isTip ? 5 : 2;
+
+                debugCtx.beginPath();
+                debugCtx.arc(x, y, size, 0, Math.PI * 2);
+                debugCtx.fill();
+            });
+
+            const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+            
+            debugCtx.strokeStyle = color;
+            debugCtx.lineWidth = 1;
+            debugCtx.globalAlpha = 0.3;
+            connections.forEach(([a, b]) => {
+                debugCtx.beginPath();
+                debugCtx.moveTo(landmarks[a].x * 300, landmarks[a].y * 225);
+                debugCtx.lineTo(landmarks[b].x * 300, landmarks[b].y * 225);
+                debugCtx.stroke();
+            });
+            debugCtx.globalAlpha = 1;
+        }
+
+        function processHand(landmarks, isLeft) {
+            const ghosts = isLeft ? ghostLeft : ghostRight;
+            if (CONFIG.showGhostHands) {
+                landmarks.forEach((lm, i) => {
+                    const pos = landmarkToScene(lm, isLeft);
+                    ghosts[i].position.copy(pos);
+                    ghosts[i].visible = true;
+                });
+            }
+
+            if (CONFIG.mode === 'pro') {
+                if (isLeft) processProFretting(landmarks);
+                else processProStrumming(landmarks);
+            } else {
+                if (isLeft) processNormalFretting(landmarks);
+                else processNormalStrumming(landmarks);
+            }
+        }
+
+        function landmarkToScene(lm, isLeft) {
+            const bounds = getZoneBounds();
+            
+            let nx = (lm.x - bounds.left) / (bounds.right - bounds.left);
+            let ny = (lm.y - bounds.top) / (bounds.bottom - bounds.top);
+            
+            nx = Math.max(0, Math.min(1, nx));
+            ny = Math.max(0, Math.min(1, ny));
+
+            let x, y, z;
+
+            if (CONFIG.mode === 'pro') {
+                x = (nx - 0.5) * 22;
+                y = (0.5 - ny) * 8;
+                z = (0.3 - lm.z) * 6 + 2;
+            } else {
+                x = (nx - 0.5) * 12;
+                y = (0.5 - ny) * 16;
+                z = (0.3 - lm.z) * 6 + 2;
+            }
+
+            if (CONFIG.mirrorCamera) x = -x;
+
+            return new THREE.Vector3(x, y, Math.max(0.5, z));
+        }
+
+        function normalizeToZone(lm) {
+            const bounds = getZoneBounds();
+            return {
+                x: (lm.x - bounds.left) / (bounds.right - bounds.left),
+                y: (lm.y - bounds.top) / (bounds.bottom - bounds.top),
+                z: lm.z
+            };
+        }
+
+        function processProFretting(landmarks) {
+            const tips = [8, 12, 16, 20];
+            const numStrings = strings3D.length;
+
+            tips.forEach(tipIdx => {
+                const lm = landmarks[tipIdx];
+                const norm = normalizeToZone(lm);
+
+                if (norm.x > 0.5) return;
+
+                const fretNorm = 1 - (norm.x / 0.5);
+                const fret = Math.round(fretNorm * CONFIG.frets);
+
+                // Y mapping: 0 = top = string 0 (low E), 1 = bottom = string 5 (high E)
+                const stringFloat = norm.y * numStrings;
+                const stringIdx = Math.max(0, Math.min(numStrings - 1, Math.floor(stringFloat)));
+
+                if (lm.z < 0.1) {
+                    frettedNotes[stringIdx] = Math.max(frettedNotes[stringIdx] || 0, fret);
+                }
+            });
+        }
+
+        function processProStrumming(landmarks) {
+            const indexTip = landmarks[8];
+            const norm = normalizeToZone(indexTip);
+            const numStrings = strings3D.length;
+
+            if (norm.x < 0.5) return;
+
+            for (let i = 0; i < numStrings; i++) {
+                // Y mapping: 0 = top = string 0, 1 = bottom = string numStrings-1
+                const stringCenter = (i + 0.5) / numStrings;
+                const dist = Math.abs(norm.y - stringCenter);
+
+                if (dist < CONFIG.stringDetectionWidth) {
+                    const lastPos = lastStrumPos[i];
+
+                    if (lastPos !== undefined) {
+                        const velocity = Math.abs(norm.y - lastPos);
+
+                        if (velocity > CONFIG.strumSensitivity && !strumCooldown[i]) {
+                            const fret = frettedNotes[i] || 0;
+                            const note = getNoteAtFret(i, fret);
+
+                            playNote(note, Math.min(1, velocity * 25));
+                            triggerStringGlow(i);
+
+                            strumCooldown[i] = true;
+                            setTimeout(() => strumCooldown[i] = false, 120);
+
+                            document.getElementById('dbg-string').textContent = currentTuning[i]?.note || '';
+                            document.getElementById('dbg-fret').textContent = fret;
+                        }
+                    }
+
+                    lastStrumPos[i] = norm.y;
+                } else {
+                    lastStrumPos[i] = undefined;
+                }
+            }
+        }
+
+        function processNormalFretting(landmarks) {
+            const tips = [8, 12, 16, 20];
+            const numStrings = strings3D.length;
+
+            tips.forEach(tipIdx => {
+                const lm = landmarks[tipIdx];
+                const norm = normalizeToZone(lm);
+
+                // X mapping: 0 = left = string 0 (low E), 1 = right = string 5 (high E)
+                const stringFloat = norm.x * numStrings;
+                const stringIdx = Math.max(0, Math.min(numStrings - 1, Math.floor(stringFloat)));
+
+                const fretNorm = 1 - norm.y;
+                const fret = Math.round(fretNorm * CONFIG.frets);
+
+                if (lm.z < 0.1) {
+                    frettedNotes[stringIdx] = Math.max(frettedNotes[stringIdx] || 0, fret);
+                }
+            });
+        }
+
+        function processNormalStrumming(landmarks) {
+            const indexTip = landmarks[8];
+            const norm = normalizeToZone(indexTip);
+            const numStrings = strings3D.length;
+
+            for (let i = 0; i < numStrings; i++) {
+                const stringCenter = (i + 0.5) / numStrings;
+                const dist = Math.abs(norm.x - stringCenter);
+
+                if (dist < CONFIG.stringDetectionWidth) {
+                    const lastPos = lastStrumPos[i];
+
+                    if (lastPos !== undefined) {
+                        const velocity = Math.abs(norm.y - lastPos);
+
+                        if (velocity > CONFIG.strumSensitivity && !strumCooldown[i]) {
+                            const fret = frettedNotes[i] || 0;
+                            const note = getNoteAtFret(i, fret);
+
+                            playNote(note, Math.min(1, velocity * 25));
+                            triggerStringGlow(i);
+
+                            strumCooldown[i] = true;
+                            setTimeout(() => strumCooldown[i] = false, 120);
+
+                            document.getElementById('dbg-string').textContent = currentTuning[i]?.note || '';
+                            document.getElementById('dbg-fret').textContent = fret;
+                        }
+                    }
+
+                    lastStrumPos[i] = norm.y;
+                } else {
+                    lastStrumPos[i] = undefined;
+                }
+            }
+        }
+
+        function updateDebugPanel() {
+            if (!CONFIG.showDebug) return;
+
+            if (rawHandData.left) {
+                const lm = rawHandData.left[8];
+                document.getElementById('dbg-lx').textContent = lm.x.toFixed(3);
+                document.getElementById('dbg-ly').textContent = lm.y.toFixed(3);
+            } else {
+                document.getElementById('dbg-lx').textContent = '—';
+                document.getElementById('dbg-ly').textContent = '—';
+            }
+
+            if (rawHandData.right) {
+                const lm = rawHandData.right[8];
+                document.getElementById('dbg-rx').textContent = lm.x.toFixed(3);
+                document.getElementById('dbg-ry').textContent = lm.y.toFixed(3);
+            } else {
+                document.getElementById('dbg-rx').textContent = '—';
+                document.getElementById('dbg-ry').textContent = '—';
+            }
+        }
+
+        // ==================== UI ====================
+        function initUI() {
+            document.getElementById('settings-toggle').addEventListener('click', () => {
+                document.getElementById('settings-sidebar').classList.toggle('open');
+            });
+
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    CONFIG.mode = btn.dataset.mode;
+                    document.getElementById('mode-badge').textContent = CONFIG.mode.toUpperCase();
+                    document.getElementById('tuning-panel').classList.toggle('visible', CONFIG.mode === 'pro');
+
+                    createGuitar();
+                    setCameraForMode();
+                    frettedNotes = {};
+                    lastStrumPos = {};
+                });
+            });
+
+            document.querySelectorAll('.guitar-type-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.guitar-type-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    CONFIG.guitarType = btn.dataset.type;
+
+                    createGuitar();
+                    setupSynth();
+                    buildTuningKnobs();
+                    frettedNotes = {};
+                });
+            });
+
+            setupSlider('zone-size', 'zone-size-value', v => CONFIG.zoneSize = v / 100, v => v + '%');
+            setupSlider('zone-x-offset', 'zone-x-value', v => CONFIG.zoneXOffset = v / 100, v => v + '%');
+            setupSlider('zone-y-offset', 'zone-y-value', v => CONFIG.zoneYOffset = v / 100, v => v + '%');
+            setupSlider('string-width', 'string-width-value', v => CONFIG.stringDetectionWidth = v);
+            setupSlider('strum-sensitivity', 'strum-sens-value', v => CONFIG.strumSensitivity = v);
+
+            setupSlider('volume', 'volume-value', v => {
+                CONFIG.volume = v / 100;
+                if (synth) synth.volume.value = Tone.gainToDb(CONFIG.volume);
+            }, v => v + '%');
+            setupSlider('reverb', 'reverb-value', v => {
+                CONFIG.reverb = v / 100;
+                if (reverb) reverb.wet.value = CONFIG.reverb;
+            }, v => v + '%');
+
+            setupToggle('distortion-toggle', v => {
+                CONFIG.distortion = v;
+                if (distortion) distortion.wet.value = v ? 0.4 : 0;
+            });
+            setupToggle('sustain-toggle', v => { CONFIG.sustain = v; setupSynth(); }, true);
+            setupToggle('mirror-toggle', v => {
+                CONFIG.mirrorCamera = v;
+                document.getElementById('webcam-container').classList.toggle('mirrored', v);
+            }, true);
+            setupToggle('ghost-toggle', v => CONFIG.showGhostHands = v, true);
+            setupToggle('debug-toggle', v => {
+                CONFIG.showDebug = v;
+                document.getElementById('hand-debug').style.display = v ? 'block' : 'none';
+            }, true);
+            setupToggle('tuner-toggle', v => {
+                CONFIG.showTuner = v;
+                document.getElementById('auto-tuner').classList.toggle('visible', v);
+                if (!v && tunerRunning) stopTuner();
+            });
+
+            document.getElementById('reset-btn').addEventListener('click', resetDefaults);
+            document.getElementById('start-btn').addEventListener('click', async () => {
+                document.getElementById('instructions-modal').classList.add('hidden');
+                await initAudio();
+            });
+
+            document.getElementById('tuner-btn').addEventListener('click', () => {
+                if (tunerRunning) stopTuner();
+                else startTuner();
+            });
+
+            buildTuningKnobs();
+        }
+
+        function setupSlider(id, valueId, callback, formatter = v => v) {
+            const slider = document.getElementById(id);
+            const display = document.getElementById(valueId);
+            slider.addEventListener('input', () => {
+                const v = parseFloat(slider.value);
+                display.textContent = formatter(v);
+                callback(v);
+            });
+        }
+
+        function setupToggle(id, callback, initial = false) {
+            const el = document.getElementById(id);
+            if (initial) el.classList.add('active');
+            el.addEventListener('click', () => {
+                el.classList.toggle('active');
+                callback(el.classList.contains('active'));
+            });
+        }
+
+        function buildTuningKnobs() {
+            const panel = document.getElementById('tuning-panel');
+            panel.innerHTML = '<h4>Tuning</h4>';
+
+            currentTuning.forEach((t, i) => {
+                const row = document.createElement('div');
+                row.className = 'tuning-row';
+                row.innerHTML = `
+                    <span class="tuning-label">${t.note}</span>
+                    <div class="tuning-knob" data-idx="${i}" data-rot="0"></div>
+                    <span class="tuning-freq">${t.freq.toFixed(1)}Hz</span>
+                `;
+                panel.appendChild(row);
+
+                const knob = row.querySelector('.tuning-knob');
+                let dragging = false, startY = 0, startRot = 0;
+
+                knob.addEventListener('mousedown', e => {
+                    dragging = true;
+                    startY = e.clientY;
+                    startRot = parseFloat(knob.dataset.rot) || 0;
+                });
+
+                document.addEventListener('mousemove', e => {
+                    if (!dragging) return;
+                    const dy = startY - e.clientY;
+                    const newRot = startRot + dy * 2;
+                    knob.dataset.rot = newRot;
+                    knob.style.transform = `rotate(${newRot}deg)`;
+
+                    const cents = dy * 0.5;
+                    currentTuning[i].freq *= Math.pow(2, cents / 1200);
+                    row.querySelector('.tuning-freq').textContent = currentTuning[i].freq.toFixed(1) + 'Hz';
+                });
+
+                document.addEventListener('mouseup', () => dragging = false);
+            });
+        }
+
+        function resetDefaults() {
+            CONFIG.zoneSize = 0.70;
+            CONFIG.zoneXOffset = 0.00;
+            CONFIG.zoneYOffset = 0.10;
+            CONFIG.stringDetectionWidth = 0.14;
+            CONFIG.strumSensitivity = 0.012;
+            CONFIG.volume = 0.8;
+            CONFIG.reverb = 0.25;
+            CONFIG.distortion = false;
+            CONFIG.sustain = true;
+
+            document.getElementById('zone-size').value = 70;
+            document.getElementById('zone-x-offset').value = 0;
+            document.getElementById('zone-y-offset').value = 10;
+            document.getElementById('string-width').value = 0.14;
+            document.getElementById('strum-sensitivity').value = 0.012;
+            document.getElementById('volume').value = 80;
+            document.getElementById('reverb').value = 25;
+
+            document.getElementById('zone-size-value').textContent = '70%';
+            document.getElementById('zone-x-value').textContent = '0%';
+            document.getElementById('zone-y-value').textContent = '10%';
+            document.getElementById('string-width-value').textContent = '0.14';
+            document.getElementById('strum-sens-value').textContent = '0.012';
+            document.getElementById('volume-value').textContent = '80%';
+            document.getElementById('reverb-value').textContent = '25%';
+
+            document.getElementById('distortion-toggle').classList.remove('active');
+            document.getElementById('sustain-toggle').classList.add('active');
+
+            setupSynth();
+
+            const gc = GUITAR_TYPES[CONFIG.guitarType];
+            currentTuning = [...CONFIG.tuning[gc.tuning]];
+            buildTuningKnobs();
+            updateStringIndicators(strings3D.length);
+        }
+
+        // ==================== ANIMATION ====================
+        function animate() {
+            requestAnimationFrame(animate);
+
+            frettedNotes = {};
+
+            stringGlows.forEach((g, i) => {
+                if (g.material.opacity > 0) {
+                    g.material.opacity -= 0.03;
+                    strings3D[i].material.emissiveIntensity = 0.3 + g.material.opacity * 0.7;
+                }
+            });
+
+            const t = Date.now() * 0.0002;
+            camera.position.x += Math.sin(t) * 0.0008;
+
+            renderer.render(scene, camera);
+        }
+
+        // ==================== INIT ====================
+        async function init() {
+            try {
+                document.getElementById('loading-text').textContent = 'Loading 3D';
+                initThree();
+
+                document.getElementById('loading-text').textContent = 'Starting Camera';
+                await initMediaPipe();
+
+                document.getElementById('loading-text').textContent = 'Setting Up';
+                initUI();
+
+                document.getElementById('loading-text').textContent = 'Ready';
+                setTimeout(() => {
+                    document.getElementById('loading-screen').classList.add('hidden');
+                    document.getElementById('instructions-modal').classList.remove('hidden');
+                }, 400);
+
+                animate();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loading-text').textContent = 'Error: ' + err.message;
+            }
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
