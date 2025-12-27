@@ -167,76 +167,58 @@
             box-shadow: 0 0 12px var(--accent-green);
         }
 
-        /* Mode Switcher */
-        #mode-switcher {
+        /* Guitar Selector */
+        #guitar-selector {
             position: fixed;
             top: 70px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            padding: 4px;
-            border-radius: 30px;
+            gap: 10px;
             z-index: 100;
-        }
-
-        .mode-btn {
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 10px 24px;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 26px;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .mode-btn:hover {
-            color: var(--text-secondary);
-        }
-
-        .mode-btn.active {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-primary);
-        }
-
-        /* Guitar Selector */
-        #guitar-selector {
-            position: fixed;
-            top: 125px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 8px;
-            z-index: 100;
+            padding: 6px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
         .guitar-type-btn {
             font-family: 'Inter', sans-serif;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: 500;
-            padding: 8px 16px;
-            border: 1px solid var(--glass-border);
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            padding: 10px 22px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             color: var(--text-secondary);
             cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            border-radius: 50px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
 
         .guitar-type-btn:hover {
-            border-color: var(--glass-highlight);
+            border-color: rgba(255, 255, 255, 0.25);
+            background: rgba(255, 255, 255, 0.08);
             color: var(--text-primary);
+            transform: translateY(-1px);
+            box-shadow:
+                0 4px 16px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.12);
         }
 
         .guitar-type-btn.active {
             border-color: var(--accent-orange);
             color: var(--accent-orange);
-            background: rgba(255, 107, 0, 0.1);
+            background: rgba(255, 107, 0, 0.15);
+            box-shadow:
+                0 4px 20px rgba(255, 107, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
         }
 
         /* Settings Toggle */
@@ -798,9 +780,9 @@
     <div id="instructions-modal" class="hidden">
         <div class="modal-content">
             <h2>NOT A GUITAR</h2>
-            <p><span class="highlight">Normal Mode</span> — Vertical fretboard, strum with right hand</p>
-            <p><span class="highlight">Pro Mode</span> — Horizontal guitar, left hand frets, right hand strums</p>
-            <p>Adjust the zone sliders to calibrate for your distance from camera</p>
+            <p><span class="highlight">Left hand</span> controls fretting — move horizontally for fret positions</p>
+            <p><span class="highlight">Right hand</span> controls strumming — move vertically across strings</p>
+            <p>Adjust the zone sliders in settings to calibrate for your distance from camera</p>
             <button class="btn primary" id="start-btn">Start Playing</button>
         </div>
     </div>
@@ -816,7 +798,7 @@
     <div id="header">
         <div>
             <span id="logo">Not a Guitar</span>
-            <span id="mode-badge">NORMAL</span>
+            <span id="mode-badge">PRO</span>
         </div>
         <div id="status-bar">
             <div class="status-indicator">
@@ -836,11 +818,6 @@
                 <span>Audio</span>
             </div>
         </div>
-    </div>
-
-    <div id="mode-switcher" class="glass">
-        <button class="mode-btn active" data-mode="normal">Normal</button>
-        <button class="mode-btn" data-mode="pro">Pro Mode</button>
     </div>
 
     <div id="guitar-selector">
@@ -983,7 +960,7 @@
     <script>
         // ==================== CONFIG ====================
         const CONFIG = {
-            mode: 'normal',
+            mode: 'pro',
             guitarType: 'acoustic',
             strings: 6,
             frets: 12,
@@ -1878,20 +1855,8 @@
                 document.getElementById('settings-sidebar').classList.toggle('open');
             });
 
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    CONFIG.mode = btn.dataset.mode;
-                    document.getElementById('mode-badge').textContent = CONFIG.mode.toUpperCase();
-                    document.getElementById('tuning-panel').classList.toggle('visible', CONFIG.mode === 'pro');
-
-                    createGuitar();
-                    setCameraForMode();
-                    frettedNotes = {};
-                    lastStrumPos = {};
-                });
-            });
+            // Show tuning panel by default (Pro mode)
+            document.getElementById('tuning-panel').classList.add('visible');
 
             document.querySelectorAll('.guitar-type-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
