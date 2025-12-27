@@ -878,7 +878,7 @@
     <!-- Mic Level Bar (visible when Auto Pilot is on) -->
     <div id="mic-level-bar">
         <div id="mic-level-fill"></div>
-        <div class="threshold-marker" style="left: 15%;"></div>
+        <div class="threshold-marker" style="left: 20%;"></div>
     </div>
 
     <button id="settings-toggle" class="glass">
@@ -976,16 +976,16 @@
             <div class="setting-row">
                 <div class="setting-label">
                     <span>Mic Sensitivity</span>
-                    <span class="setting-value" id="mic-sens-value">15%</span>
+                    <span class="setting-value" id="mic-sens-value">20%</span>
                 </div>
-                <input type="range" id="mic-sensitivity" min="5" max="50" step="1" value="15">
+                <input type="range" id="mic-sensitivity" min="5" max="50" step="1" value="20">
             </div>
             <div class="setting-row">
                 <div class="setting-label">
                     <span>Strum Cooldown</span>
-                    <span class="setting-value" id="mic-cooldown-value">150ms</span>
+                    <span class="setting-value" id="mic-cooldown-value">200ms</span>
                 </div>
-                <input type="range" id="mic-cooldown" min="50" max="400" step="10" value="150">
+                <input type="range" id="mic-cooldown" min="50" max="400" step="10" value="200">
             </div>
         </div>
 
@@ -1021,8 +1021,8 @@
 
             // Auto Pilot (Vocal Strum) settings
             autoPilot: false,
-            micSensitivity: 0.15,
-            micCooldown: 150, // ms between vocal strums
+            micSensitivity: 0.20,
+            micCooldown: 200, // ms between vocal strums
 
             // String colors: index 0 = LOW E (thickest), index 5 = HIGH E (thinnest)
             stringColors: [
@@ -1074,6 +1074,8 @@
         let micReady = false;
         let lastVocalStrum = 0;
         let currentMicLevel = 0;
+        let previousMicLevel = 0;
+        let micSilenceFrames = 0; // Count frames of relative silence for onset detection
 
         // ==================== THREE.JS ====================
         let scene, camera, renderer;
@@ -1385,13 +1387,33 @@
                 micStatus.classList.remove('listening');
             }
 
-            // Check for peak (vocal strum trigger)
+            // ONSET DETECTION: Trigger on sudden increase (not sustained level)
+            // This prevents feedback from guitar output triggering more strums
+            const levelIncrease = level - previousMicLevel;
             const now = Date.now();
-            if (level > CONFIG.micSensitivity && (now - lastVocalStrum) > CONFIG.micCooldown) {
-                triggerVocalStrum(level);
-                lastVocalStrum = now;
+            const cooldownOk = (now - lastVocalStrum) > CONFIG.micCooldown;
+
+            // Track silence frames for better onset detection
+            if (level < CONFIG.micSensitivity * 0.5) {
+                micSilenceFrames++;
+            } else {
+                micSilenceFrames = 0;
             }
 
+            // Trigger on:
+            // 1. Level above threshold AND
+            // 2. Sudden increase (onset) OR we've had some silence before AND
+            // 3. Cooldown elapsed
+            const isOnset = levelIncrease > CONFIG.micSensitivity * 0.3;
+            const wasQuiet = micSilenceFrames > 5 || previousMicLevel < CONFIG.micSensitivity * 0.3;
+
+            if (level > CONFIG.micSensitivity && cooldownOk && (isOnset || wasQuiet)) {
+                triggerVocalStrum(level);
+                lastVocalStrum = now;
+                micSilenceFrames = 0;
+            }
+
+            previousMicLevel = level;
             requestAnimationFrame(micMonitorLoop);
         }
 
@@ -1399,38 +1421,44 @@
             if (!audioReady) return;
 
             const numStrings = strings3D.length;
-            const velocity = Math.min(1, intensity * 2);
+            const velocity = Math.min(0.8, intensity * 1.5);
 
-            // Strum all strings that are being fretted, or all open strings if none fretted
-            const hasAnyFret = Object.keys(frettedNotes).length > 0;
-
-            if (hasAnyFret) {
-                // Play only fretted strings
-                for (let i = 0; i < numStrings; i++) {
-                    const fret = frettedNotes[i];
-                    if (fret !== undefined) {
-                        const note = getNoteAtFret(i, fret);
-                        playNote(note, velocity);
-                        triggerStringGlow(i);
-
-                        document.getElementById('dbg-string').textContent = currentTuning[i]?.note || '';
-                        document.getElementById('dbg-note').textContent = note;
-                        document.getElementById('dbg-fret').textContent = fret;
-                    }
+            // Get list of fretted strings
+            const frettedStringIndices = [];
+            for (let i = 0; i < numStrings; i++) {
+                if (frettedNotes[i] !== undefined) {
+                    frettedStringIndices.push(i);
                 }
-            } else {
-                // Strum all open strings (chord strum)
-                for (let i = 0; i < numStrings; i++) {
-                    const note = getNoteAtFret(i, 0);
-                    // Slight delay between strings for realistic strum effect
+            }
+
+            if (frettedStringIndices.length > 0) {
+                // Play only the fretted strings with strum effect
+                frettedStringIndices.forEach((stringIdx, i) => {
+                    const fret = frettedNotes[stringIdx];
+                    const note = getNoteAtFret(stringIdx, fret);
+
+                    // Stagger the notes slightly for realistic strum
                     setTimeout(() => {
-                        playNote(note, velocity * 0.8);
-                        triggerStringGlow(i);
-                    }, i * 15);
-                }
+                        playNote(note, velocity);
+                        triggerStringGlow(stringIdx);
+                    }, i * 20);
+                });
 
-                document.getElementById('dbg-string').textContent = 'ALL';
-                document.getElementById('dbg-note').textContent = 'Open';
+                // Update debug with last string
+                const lastIdx = frettedStringIndices[frettedStringIndices.length - 1];
+                document.getElementById('dbg-string').textContent = currentTuning[lastIdx]?.note || '';
+                document.getElementById('dbg-note').textContent = getNoteAtFret(lastIdx, frettedNotes[lastIdx]);
+                document.getElementById('dbg-fret').textContent = frettedNotes[lastIdx];
+            } else {
+                // No frets pressed - play a single rotating string (sounds better than all at once)
+                const stringIdx = Math.floor(Date.now() / 500) % numStrings;
+                const note = getNoteAtFret(stringIdx, 0);
+
+                playNote(note, velocity * 0.7);
+                triggerStringGlow(stringIdx);
+
+                document.getElementById('dbg-string').textContent = currentTuning[stringIdx]?.note || '';
+                document.getElementById('dbg-note').textContent = note;
                 document.getElementById('dbg-fret').textContent = '0';
             }
         }
@@ -2176,14 +2204,14 @@
             document.getElementById('sustain-toggle').classList.add('active');
 
             // Reset Auto Pilot
-            CONFIG.micSensitivity = 0.15;
-            CONFIG.micCooldown = 150;
+            CONFIG.micSensitivity = 0.20;
+            CONFIG.micCooldown = 200;
             setAutoPilot(false);
 
-            document.getElementById('mic-sensitivity').value = 15;
-            document.getElementById('mic-cooldown').value = 150;
-            document.getElementById('mic-sens-value').textContent = '15%';
-            document.getElementById('mic-cooldown-value').textContent = '150ms';
+            document.getElementById('mic-sensitivity').value = 20;
+            document.getElementById('mic-cooldown').value = 200;
+            document.getElementById('mic-sens-value').textContent = '20%';
+            document.getElementById('mic-cooldown-value').textContent = '200ms';
 
             setupSynth();
 
