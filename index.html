@@ -630,6 +630,157 @@
             color: var(--accent-orange);
             opacity: 0.8;
         }
+
+        /* Auto Pilot Toggle */
+        #auto-pilot-toggle {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 20px;
+            border-radius: 50px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #auto-pilot-toggle:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        #auto-pilot-toggle.active {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 212, 255, 0.1);
+        }
+
+        #auto-pilot-toggle .toggle-icon {
+            width: 20px;
+            height: 20px;
+            fill: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        #auto-pilot-toggle.active .toggle-icon {
+            fill: var(--accent-cyan);
+        }
+
+        #auto-pilot-toggle .toggle-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        #auto-pilot-toggle.active .toggle-label {
+            color: var(--accent-cyan);
+        }
+
+        #auto-pilot-toggle .toggle-switch-mini {
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            position: relative;
+            transition: background 0.3s ease;
+        }
+
+        #auto-pilot-toggle.active .toggle-switch-mini {
+            background: var(--accent-cyan);
+        }
+
+        #auto-pilot-toggle .toggle-switch-mini::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            transition: left 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        #auto-pilot-toggle.active .toggle-switch-mini::after {
+            left: 18px;
+        }
+
+        /* Mic Status Indicator */
+        .status-indicator#mic-status-indicator {
+            display: none;
+        }
+
+        .status-indicator#mic-status-indicator.visible {
+            display: flex;
+        }
+
+        .status-dot#mic-status {
+            background: rgba(255, 60, 60, 0.8);
+            transition: all 0.1s ease;
+        }
+
+        .status-dot#mic-status.active {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 12px var(--accent-cyan);
+        }
+
+        .status-dot#mic-status.listening {
+            background: var(--accent-green);
+            box-shadow: 0 0 16px var(--accent-green);
+            animation: pulse-mic 0.3s ease;
+        }
+
+        @keyframes pulse-mic {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.4); }
+            100% { transform: scale(1); }
+        }
+
+        /* Mic level visualizer bar */
+        #mic-level-bar {
+            position: fixed;
+            bottom: 70px;
+            right: 24px;
+            width: 160px;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            z-index: 100;
+            overflow: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #mic-level-bar.visible {
+            opacity: 1;
+        }
+
+        #mic-level-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 3px;
+            transition: width 0.05s ease;
+        }
+
+        #mic-level-bar .threshold-marker {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: var(--accent-orange);
+            opacity: 0.8;
+        }
     </style>
 </head>
 <body>
@@ -678,6 +829,10 @@
                 <span class="status-dot" id="audio-status"></span>
                 <span>Audio</span>
             </div>
+            <div class="status-indicator" id="mic-status-indicator">
+                <span class="status-dot" id="mic-status"></span>
+                <span>Mic</span>
+            </div>
         </div>
     </div>
 
@@ -709,6 +864,21 @@
 
     <div id="note-display">
         <div class="note-badge glass" id="current-note"></div>
+    </div>
+
+    <!-- Auto Pilot Toggle -->
+    <div id="auto-pilot-toggle">
+        <svg class="toggle-icon" viewBox="0 0 24 24">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.91-3c-.49 0-.9.36-.98.85C16.52 14.2 14.47 16 12 16s-4.52-1.8-4.93-4.15c-.08-.49-.49-.85-.98-.85-.61 0-1.09.54-1 1.14.49 3 2.89 5.35 5.91 5.78V20c0 .55.45 1 1 1s1-.45 1-1v-2.08c3.02-.43 5.42-2.78 5.91-5.78.1-.6-.39-1.14-1-1.14z"/>
+        </svg>
+        <span class="toggle-label">Auto Pilot</span>
+        <div class="toggle-switch-mini"></div>
+    </div>
+
+    <!-- Mic Level Bar (visible when Auto Pilot is on) -->
+    <div id="mic-level-bar">
+        <div id="mic-level-fill"></div>
+        <div class="threshold-marker" style="left: 15%;"></div>
     </div>
 
     <button id="settings-toggle" class="glass">
@@ -798,6 +968,28 @@
         </div>
 
         <div class="settings-section">
+            <h3>Auto Pilot</h3>
+            <div class="toggle-container">
+                <span>Vocal Strum Mode</span>
+                <div class="toggle-switch" id="autopilot-toggle"></div>
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Mic Sensitivity</span>
+                    <span class="setting-value" id="mic-sens-value">15%</span>
+                </div>
+                <input type="range" id="mic-sensitivity" min="5" max="50" step="1" value="15">
+            </div>
+            <div class="setting-row">
+                <div class="setting-label">
+                    <span>Strum Cooldown</span>
+                    <span class="setting-value" id="mic-cooldown-value">150ms</span>
+                </div>
+                <input type="range" id="mic-cooldown" min="50" max="400" step="10" value="150">
+            </div>
+        </div>
+
+        <div class="settings-section">
             <h3>Tools</h3>
             <button class="btn" id="reset-btn">Reset to Defaults</button>
         </div>
@@ -826,7 +1018,12 @@
             mirrorCamera: true,
             showGhostHands: true,
             showDebug: true,
-            
+
+            // Auto Pilot (Vocal Strum) settings
+            autoPilot: false,
+            micSensitivity: 0.15,
+            micCooldown: 150, // ms between vocal strums
+
             // String colors: index 0 = LOW E (thickest), index 5 = HIGH E (thinnest)
             stringColors: [
                 0xaa00ff, // E2 (low) - Purple
@@ -863,14 +1060,20 @@
         };
 
         let currentTuning = [...CONFIG.tuning.standard];
-        
+
         // CRITICAL: Track fretted notes per string - this is what makes different frets work!
         let frettedNotes = {};  // { stringIndex: fretNumber }
         let lastStrumPos = {};
         let strumCooldown = {};
-        
+
         // Store last detected fret position continuously
         let currentFretPosition = 0;
+
+        // Auto Pilot (Microphone) state
+        let mic, micMeter, micFollower;
+        let micReady = false;
+        let lastVocalStrum = 0;
+        let currentMicLevel = 0;
 
         // ==================== THREE.JS ====================
         let scene, camera, renderer;
@@ -1124,6 +1327,144 @@
             const octaveUp = Math.floor(totalSemitones / 12);
 
             return notes[newIdx] + (baseOctave + octaveUp);
+        }
+
+        // ==================== MICROPHONE (AUTO PILOT) ====================
+        async function initMicrophone() {
+            try {
+                mic = new Tone.UserMedia();
+                await mic.open();
+
+                // Create meter for level detection
+                micMeter = new Tone.Meter({ smoothing: 0.8 });
+
+                // Create envelope follower for peak detection
+                micFollower = new Tone.Follower(0.1);
+
+                // Connect mic to meter
+                mic.connect(micMeter);
+                mic.connect(micFollower);
+
+                micReady = true;
+                document.getElementById('mic-status').classList.add('active');
+                console.log('Microphone initialized');
+
+                // Start the mic monitoring loop
+                requestAnimationFrame(micMonitorLoop);
+
+            } catch (err) {
+                console.error('Microphone initialization failed:', err);
+                micReady = false;
+            }
+        }
+
+        function micMonitorLoop() {
+            if (!micReady || !CONFIG.autoPilot) {
+                // Keep the loop running but don't process
+                requestAnimationFrame(micMonitorLoop);
+                return;
+            }
+
+            // Get current mic level (in dB, typically -100 to 0)
+            const levelDb = micMeter.getValue();
+            // Convert to 0-1 range (roughly)
+            const level = Math.max(0, Math.min(1, (levelDb + 60) / 60));
+            currentMicLevel = level;
+
+            // Update visual level bar
+            const levelFill = document.getElementById('mic-level-fill');
+            if (levelFill) {
+                levelFill.style.width = (level * 100) + '%';
+            }
+
+            // Update mic status indicator
+            const micStatus = document.getElementById('mic-status');
+            if (level > CONFIG.micSensitivity) {
+                micStatus.classList.add('listening');
+            } else {
+                micStatus.classList.remove('listening');
+            }
+
+            // Check for peak (vocal strum trigger)
+            const now = Date.now();
+            if (level > CONFIG.micSensitivity && (now - lastVocalStrum) > CONFIG.micCooldown) {
+                triggerVocalStrum(level);
+                lastVocalStrum = now;
+            }
+
+            requestAnimationFrame(micMonitorLoop);
+        }
+
+        function triggerVocalStrum(intensity) {
+            if (!audioReady) return;
+
+            const numStrings = strings3D.length;
+            const velocity = Math.min(1, intensity * 2);
+
+            // Strum all strings that are being fretted, or all open strings if none fretted
+            const hasAnyFret = Object.keys(frettedNotes).length > 0;
+
+            if (hasAnyFret) {
+                // Play only fretted strings
+                for (let i = 0; i < numStrings; i++) {
+                    const fret = frettedNotes[i];
+                    if (fret !== undefined) {
+                        const note = getNoteAtFret(i, fret);
+                        playNote(note, velocity);
+                        triggerStringGlow(i);
+
+                        document.getElementById('dbg-string').textContent = currentTuning[i]?.note || '';
+                        document.getElementById('dbg-note').textContent = note;
+                        document.getElementById('dbg-fret').textContent = fret;
+                    }
+                }
+            } else {
+                // Strum all open strings (chord strum)
+                for (let i = 0; i < numStrings; i++) {
+                    const note = getNoteAtFret(i, 0);
+                    // Slight delay between strings for realistic strum effect
+                    setTimeout(() => {
+                        playNote(note, velocity * 0.8);
+                        triggerStringGlow(i);
+                    }, i * 15);
+                }
+
+                document.getElementById('dbg-string').textContent = 'ALL';
+                document.getElementById('dbg-note').textContent = 'Open';
+                document.getElementById('dbg-fret').textContent = '0';
+            }
+        }
+
+        function setAutoPilot(enabled) {
+            CONFIG.autoPilot = enabled;
+
+            const toggle = document.getElementById('auto-pilot-toggle');
+            const micIndicator = document.getElementById('mic-status-indicator');
+            const levelBar = document.getElementById('mic-level-bar');
+            const settingsToggle = document.getElementById('autopilot-toggle');
+
+            if (enabled) {
+                toggle.classList.add('active');
+                micIndicator.classList.add('visible');
+                levelBar.classList.add('visible');
+                settingsToggle.classList.add('active');
+
+                // Update threshold marker position
+                const marker = levelBar.querySelector('.threshold-marker');
+                if (marker) {
+                    marker.style.left = (CONFIG.micSensitivity * 100) + '%';
+                }
+
+                // Initialize mic if not ready
+                if (!micReady) {
+                    initMicrophone();
+                }
+            } else {
+                toggle.classList.remove('active');
+                micIndicator.classList.remove('visible');
+                levelBar.classList.remove('visible');
+                settingsToggle.classList.remove('active');
+            }
         }
 
         // ==================== MEDIAPIPE ====================
@@ -1571,6 +1912,12 @@
         // In mirrored view, right hand appears on RIGHT of screen
         // In raw coords, that means LOW X values (x < 0.5)
         function processProStrumming(landmarks) {
+            // Skip hand strumming when Auto Pilot (vocal strum) is active
+            if (CONFIG.autoPilot) {
+                targetedString = -1;
+                return;
+            }
+
             const indexTip = landmarks[8];
             const norm = normalizeToZone(indexTip);
             const numStrings = strings3D.length;
@@ -1709,6 +2056,28 @@
                 document.getElementById('hand-debug').style.display = v ? 'block' : 'none';
             }, true);
 
+            // Auto Pilot controls
+            document.getElementById('auto-pilot-toggle').addEventListener('click', () => {
+                setAutoPilot(!CONFIG.autoPilot);
+            });
+
+            setupToggle('autopilot-toggle', v => {
+                setAutoPilot(v);
+            });
+
+            setupSlider('mic-sensitivity', 'mic-sens-value', v => {
+                CONFIG.micSensitivity = v / 100;
+                // Update threshold marker
+                const marker = document.querySelector('#mic-level-bar .threshold-marker');
+                if (marker) {
+                    marker.style.left = v + '%';
+                }
+            }, v => v + '%');
+
+            setupSlider('mic-cooldown', 'mic-cooldown-value', v => {
+                CONFIG.micCooldown = v;
+            }, v => v + 'ms');
+
             document.getElementById('reset-btn').addEventListener('click', resetDefaults);
             document.getElementById('start-btn').addEventListener('click', async () => {
                 document.getElementById('instructions-modal').classList.add('hidden');
@@ -1805,6 +2174,16 @@
 
             document.getElementById('distortion-toggle').classList.remove('active');
             document.getElementById('sustain-toggle').classList.add('active');
+
+            // Reset Auto Pilot
+            CONFIG.micSensitivity = 0.15;
+            CONFIG.micCooldown = 150;
+            setAutoPilot(false);
+
+            document.getElementById('mic-sensitivity').value = 15;
+            document.getElementById('mic-cooldown').value = 150;
+            document.getElementById('mic-sens-value').textContent = '15%';
+            document.getElementById('mic-cooldown-value').textContent = '150ms';
 
             setupSynth();
 
