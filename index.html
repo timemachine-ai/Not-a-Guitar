@@ -109,18 +109,6 @@
             text-transform: uppercase;
         }
 
-        #mode-badge {
-            font-family: 'Inter', sans-serif;
-            font-size: 10px;
-            font-weight: 600;
-            padding: 4px 12px;
-            background: var(--accent-pink);
-            color: white;
-            border-radius: 20px;
-            margin-left: 12px;
-            vertical-align: middle;
-            letter-spacing: 1px;
-        }
 
         #status-bar {
             display: flex;
@@ -152,72 +140,56 @@
             box-shadow: 0 0 12px var(--accent-green);
         }
 
-        #mode-switcher {
+        #guitar-selector {
             position: fixed;
             top: 70px;
             left: 50%;
             transform: translateX(-50%);
             display: flex;
-            padding: 4px;
-            border-radius: 30px;
-            z-index: 100;
-        }
-
-        .mode-btn {
-            font-family: 'Inter', sans-serif;
-            font-size: 12px;
-            font-weight: 600;
-            padding: 10px 24px;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 26px;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .mode-btn:hover { color: var(--text-secondary); }
-
-        .mode-btn.active {
-            background: rgba(255, 255, 255, 0.1);
-            color: var(--text-primary);
-        }
-
-        #guitar-selector {
-            position: fixed;
-            top: 125px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 8px;
+            gap: 12px;
             z-index: 100;
         }
 
         .guitar-type-btn {
             font-family: 'Inter', sans-serif;
             font-size: 11px;
-            font-weight: 500;
-            padding: 8px 16px;
+            font-weight: 600;
+            padding: 10px 24px;
             border: 1px solid var(--glass-border);
-            background: var(--glass-bg);
-            backdrop-filter: blur(10px);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
             color: var(--text-secondary);
             cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.3s ease;
+            border-radius: 50px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow:
+                0 4px 15px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .guitar-type-btn:hover {
-            border-color: var(--glass-highlight);
+            border-color: rgba(255, 255, 255, 0.3);
             color: var(--text-primary);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 100%);
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 20px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
         }
 
         .guitar-type-btn.active {
             border-color: var(--accent-orange);
             color: var(--accent-orange);
-            background: rgba(255, 107, 0, 0.1);
+            background: linear-gradient(135deg, rgba(255, 107, 0, 0.2) 0%, rgba(255, 107, 0, 0.1) 100%);
+            box-shadow:
+                0 4px 20px rgba(255, 107, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.15),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.1);
         }
 
         #settings-toggle {
@@ -397,15 +369,12 @@
 
         #tuning-panel {
             position: fixed;
-            top: 175px;
+            top: 130px;
             right: 90px;
             padding: 16px;
             border-radius: 16px;
             z-index: 100;
-            display: none;
         }
-
-        #tuning-panel.visible { display: block; }
 
         #tuning-panel h4 {
             font-family: 'Anton', sans-serif;
@@ -532,7 +501,7 @@
 
         #hand-debug {
             position: fixed;
-            top: 175px;
+            top: 130px;
             left: 24px;
             padding: 14px;
             border-radius: 12px;
@@ -670,9 +639,9 @@
     <div id="instructions-modal" class="hidden">
         <div class="modal-content">
             <h2>NOT A GUITAR</h2>
-            <p><span class="highlight">Normal Mode</span> — Vertical fretboard, strum across strings</p>
-            <p><span class="highlight">Pro Mode</span> — Horizontal guitar like a real one!</p>
-            <p>Left hand frets (changes pitch), Right hand strums (plays notes)</p>
+            <p><span class="highlight">Air Guitar Experience</span> — Play a horizontal guitar just like the real thing!</p>
+            <p><span class="highlight">Left hand</span> frets the strings (changes pitch)</p>
+            <p><span class="highlight">Right hand</span> strums the strings (plays notes)</p>
             <p>Each fret = 1 semitone higher, just like a real guitar!</p>
             <p>Calibrate the zone in settings to match your hand position</p>
             <button class="btn primary" id="start-btn">Start Playing</button>
@@ -689,7 +658,6 @@
     <div id="header">
         <div>
             <span id="logo">Not a Guitar</span>
-            <span id="mode-badge">NORMAL</span>
         </div>
         <div id="status-bar">
             <div class="status-indicator">
@@ -709,11 +677,6 @@
                 <span>Audio</span>
             </div>
         </div>
-    </div>
-
-    <div id="mode-switcher" class="glass">
-        <button class="mode-btn active" data-mode="normal">Normal</button>
-        <button class="mode-btn" data-mode="pro">Pro Mode</button>
     </div>
 
     <div id="guitar-selector">
@@ -841,7 +804,7 @@
     <script>
         // ==================== CONFIG ====================
         const CONFIG = {
-            mode: 'normal',
+            mode: 'pro',
             guitarType: 'acoustic',
             strings: 6,
             frets: 22,  // Real guitar has ~22 frets
@@ -952,13 +915,8 @@
         }
 
         function setCameraForMode() {
-            if (CONFIG.mode === 'pro') {
-                camera.position.set(0, 0, 18);
-                camera.lookAt(0, 0, 0);
-            } else {
-                camera.position.set(0, -2, 16);
-                camera.lookAt(0, 2, 0);
-            }
+            camera.position.set(0, 0, 18);
+            camera.lookAt(0, 0, 0);
         }
 
         function createBackground() {
@@ -979,58 +937,9 @@
             const numStrings = gc.strings;
             currentTuning = [...CONFIG.tuning[gc.tuning]];
 
-            if (CONFIG.mode === 'pro') {
-                createHorizontalGuitar(numStrings);
-            } else {
-                createVerticalGuitar(numStrings);
-            }
+            createHorizontalGuitar(numStrings);
 
             updateStringIndicators(numStrings);
-        }
-
-        function createVerticalGuitar(numStrings) {
-            const fbWidth = 6, fbLength = 14;
-
-            const fbGeom = new THREE.BoxGeometry(fbWidth, fbLength, 0.25);
-            const fbMat = new THREE.MeshPhongMaterial({ color: 0x1a1a1a, emissive: 0x080808 });
-            fretboard = new THREE.Mesh(fbGeom, fbMat);
-            fretboard.position.set(0, 0, -0.15);
-            scene.add(fretboard);
-
-            const stringSpacing = fbWidth / (numStrings + 1);
-
-            for (let i = 0; i < numStrings; i++) {
-                const x = -fbWidth / 2 + stringSpacing * (i + 1);
-                const color = CONFIG.stringColors[i];
-                const thickness = 0.022 - i * 0.002;
-
-                const sGeom = new THREE.CylinderGeometry(thickness, thickness, fbLength, 8);
-                const sMat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.3 });
-                const string = new THREE.Mesh(sGeom, sMat);
-                string.position.set(x, 0, 0.1);
-                scene.add(string);
-                strings3D.push(string);
-
-                const gGeom = new THREE.CylinderGeometry(0.08, 0.08, fbLength, 8);
-                const gMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0 });
-                const glow = new THREE.Mesh(gGeom, gMat);
-                glow.position.copy(string.position);
-                scene.add(glow);
-                stringGlows.push(glow);
-            }
-
-            // Draw frets
-            const visibleFrets = 12;
-            const fretSpacing = fbLength / (visibleFrets + 1);
-            for (let i = 0; i < visibleFrets; i++) {
-                const y = -fbLength / 2 + fretSpacing * (i + 1);
-                const fGeom = new THREE.BoxGeometry(fbWidth - 0.4, 0.06, 0.08);
-                const fMat = new THREE.MeshPhongMaterial({ color: 0x888888, emissive: 0x222222 });
-                const fret = new THREE.Mesh(fGeom, fMat);
-                fret.position.set(0, y, 0.1);
-                scene.add(fret);
-                frets3D.push(fret);
-            }
         }
 
         function createHorizontalGuitar(numStrings) {
@@ -1340,182 +1249,144 @@
             debugCtx.strokeRect(zoneLeft, zoneTop, zoneWidth, zoneHeight);
             debugCtx.setLineDash([]);
 
-            if (CONFIG.mode === 'pro') {
-                // PRO MODE: Horizontal guitar
-                // MIRRORED VIEW (like a mirror):
-                // - User's LEFT hand appears on LEFT side of screen → FRET zone
-                // - User's RIGHT hand appears on RIGHT side of screen → STRUM zone
-                //
-                // Canvas has scaleX(-1), so:
-                // - Draw at HIGH X in canvas → appears on LEFT of mirrored view
-                // - Draw at LOW X in canvas → appears on RIGHT of mirrored view
-                //
-                // Raw MediaPipe coords with mirror:
-                // - User's left hand (their left) → HIGH raw X values
-                // - User's right hand (their right) → LOW raw X values
-                
-                const midX = zoneLeft + zoneWidth / 2;
+            // Horizontal guitar layout
+            // MIRRORED VIEW (like a mirror):
+            // - User's LEFT hand appears on LEFT side of screen → FRET zone
+            // - User's RIGHT hand appears on RIGHT side of screen → STRUM zone
+            //
+            // Canvas has scaleX(-1), so:
+            // - Draw at HIGH X in canvas → appears on LEFT of mirrored view
+            // - Draw at LOW X in canvas → appears on RIGHT of mirrored view
+            //
+            // Raw MediaPipe coords with mirror:
+            // - User's left hand (their left) → HIGH raw X values
+            // - User's right hand (their right) → LOW raw X values
 
-                // FRET zone on RIGHT of raw canvas (HIGH X) → appears on LEFT of mirrored view
-                // STRUM zone on LEFT of raw canvas (LOW X) → appears on RIGHT of mirrored view
-                
-                // Labels - draw mirrored so they read correctly
-                debugCtx.save();
-                debugCtx.scale(-1, 1); // Mirror the text so it reads correctly
-                
-                debugCtx.fillStyle = 'rgba(0, 212, 255, 0.9)';
-                debugCtx.font = '700 11px Inter';
-                debugCtx.fillText('FRET (Left)', -(zoneLeft + zoneWidth - 8), zoneTop + 16);
+            const midX = zoneLeft + zoneWidth / 2;
 
-                debugCtx.fillStyle = 'rgba(255, 0, 128, 0.9)';
-                debugCtx.fillText('STRUM (Right)', -(midX - 8), zoneTop + 16);
-                
-                debugCtx.restore();
+            // FRET zone on RIGHT of raw canvas (HIGH X) → appears on LEFT of mirrored view
+            // STRUM zone on LEFT of raw canvas (LOW X) → appears on RIGHT of mirrored view
 
-                // Divider line
-                debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                debugCtx.lineWidth = 2;
-                debugCtx.beginPath();
-                debugCtx.moveTo(midX, zoneTop);
-                debugCtx.lineTo(midX, zoneTop + zoneHeight);
-                debugCtx.stroke();
+            // Labels - draw mirrored so they read correctly
+            debugCtx.save();
+            debugCtx.scale(-1, 1); // Mirror the text so it reads correctly
 
-                // Calculate EXACT string positions for both drawing and detection
-                // Strings are in STRUM zone (LEFT half of raw = LOW X = appears on RIGHT of mirrored)
-                const strumZoneLeft = zoneLeft + 8;
-                const strumZoneRight = midX - 8;
-                const strumPadTop = 28;
-                const strumPadBottom = 8;
-                const strumZoneTop = zoneTop + strumPadTop;
-                const strumZoneHeight = zoneHeight - strumPadTop - strumPadBottom;
-                
-                // Calculate normalized Y positions for each string (relative to full zone)
-                stringYPositions = [];
-                const stringSpacing = strumZoneHeight / numStrings;
+            debugCtx.fillStyle = 'rgba(0, 212, 255, 0.9)';
+            debugCtx.font = '700 11px Inter';
+            debugCtx.fillText('FRET (Left)', -(zoneLeft + zoneWidth - 8), zoneTop + 16);
 
-                for (let i = 0; i < numStrings; i++) {
-                    const y = strumZoneTop + stringSpacing * (i + 0.5);
-                    const color = CONFIG.stringColors[i];
-                    
-                    // Store normalized position (0-1 within zone bounds)
-                    const normalizedY = (y - zoneTop) / zoneHeight;
-                    stringYPositions.push(normalizedY);
+            debugCtx.fillStyle = 'rgba(255, 0, 128, 0.9)';
+            debugCtx.fillText('STRUM (Right)', -(midX - 8), zoneTop + 16);
 
-                    // Highlight targeted string with glow
-                    if (i === targetedString) {
-                        debugCtx.shadowColor = '#' + color.toString(16).padStart(6, '0');
-                        debugCtx.shadowBlur = 15;
-                        debugCtx.strokeStyle = '#ffffff';
-                        debugCtx.lineWidth = 6;
-                        debugCtx.beginPath();
-                        debugCtx.moveTo(strumZoneLeft, y);
-                        debugCtx.lineTo(strumZoneRight, y);
-                        debugCtx.stroke();
-                        debugCtx.shadowBlur = 0;
-                    }
+            debugCtx.restore();
 
-                    // Draw string
-                    debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
-                    debugCtx.lineWidth = i === targetedString ? 5 : 3;
+            // Divider line
+            debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            debugCtx.lineWidth = 2;
+            debugCtx.beginPath();
+            debugCtx.moveTo(midX, zoneTop);
+            debugCtx.lineTo(midX, zoneTop + zoneHeight);
+            debugCtx.stroke();
+
+            // Calculate EXACT string positions for both drawing and detection
+            // Strings are in STRUM zone (LEFT half of raw = LOW X = appears on RIGHT of mirrored)
+            const strumZoneLeft = zoneLeft + 8;
+            const strumZoneRight = midX - 8;
+            const strumPadTop = 28;
+            const strumPadBottom = 8;
+            const strumZoneTop = zoneTop + strumPadTop;
+            const strumZoneHeight = zoneHeight - strumPadTop - strumPadBottom;
+
+            // Calculate normalized Y positions for each string (relative to full zone)
+            stringYPositions = [];
+            const stringSpacing = strumZoneHeight / numStrings;
+
+            for (let i = 0; i < numStrings; i++) {
+                const y = strumZoneTop + stringSpacing * (i + 0.5);
+                const color = CONFIG.stringColors[i];
+
+                // Store normalized position (0-1 within zone bounds)
+                const normalizedY = (y - zoneTop) / zoneHeight;
+                stringYPositions.push(normalizedY);
+
+                // Highlight targeted string with glow
+                if (i === targetedString) {
+                    debugCtx.shadowColor = '#' + color.toString(16).padStart(6, '0');
+                    debugCtx.shadowBlur = 15;
+                    debugCtx.strokeStyle = '#ffffff';
+                    debugCtx.lineWidth = 6;
                     debugCtx.beginPath();
                     debugCtx.moveTo(strumZoneLeft, y);
                     debugCtx.lineTo(strumZoneRight, y);
                     debugCtx.stroke();
-
-                    // Note label (mirrored)
-                    debugCtx.save();
-                    debugCtx.scale(-1, 1);
-                    debugCtx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-                    debugCtx.font = i === targetedString ? '900 12px Inter' : '700 10px Inter';
-                    debugCtx.fillText(currentTuning[i]?.note || '', -(strumZoneLeft - 4), y + 4);
-                    debugCtx.restore();
-                }
-
-                // FRET zone dimensions (RIGHT half of raw = HIGH X = appears on LEFT)
-                const fretZoneLeft = midX + 8;
-                const fretZoneRight = zoneLeft + zoneWidth - 8;
-                const fretZoneWidth = fretZoneRight - fretZoneLeft;
-                
-                // Draw strings extended into FRET zone at 50% opacity
-                for (let i = 0; i < numStrings; i++) {
-                    const y = strumZoneTop + stringSpacing * (i + 0.5);
-                    const color = CONFIG.stringColors[i];
-                    
-                    // Highlight if this string is being fretted
-                    const isFretted = frettedStrings[i] !== undefined;
-                    
-                    if (isFretted) {
-                        debugCtx.shadowColor = '#' + color.toString(16).padStart(6, '0');
-                        debugCtx.shadowBlur = 10;
-                    }
-                    
-                    // Draw string in fret zone at 50% opacity
-                    debugCtx.globalAlpha = isFretted ? 0.9 : 0.5;
-                    debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
-                    debugCtx.lineWidth = isFretted ? 4 : 2;
-                    debugCtx.beginPath();
-                    debugCtx.moveTo(fretZoneLeft, y);
-                    debugCtx.lineTo(fretZoneRight, y);
-                    debugCtx.stroke();
-                    debugCtx.globalAlpha = 1;
                     debugCtx.shadowBlur = 0;
                 }
 
-                // Draw fret markers
-                debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-                debugCtx.lineWidth = 1;
-                for (let f = 1; f <= 12; f++) {
-                    const x = fretZoneLeft + (f / 12) * fretZoneWidth;
-                    debugCtx.beginPath();
-                    debugCtx.moveTo(x, zoneTop + strumPadTop);
-                    debugCtx.lineTo(x, zoneTop + zoneHeight - strumPadBottom);
-                    debugCtx.stroke();
-                    
-                    // Fret number (mirrored)
-                    if (f % 3 === 0) {
-                        debugCtx.save();
-                        debugCtx.scale(-1, 1);
-                        debugCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-                        debugCtx.font = '600 9px Inter';
-                        debugCtx.fillText(f.toString(), -x - 4, zoneTop + zoneHeight - 12);
-                        debugCtx.restore();
-                    }
+                // Draw string
+                debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+                debugCtx.lineWidth = i === targetedString ? 5 : 3;
+                debugCtx.beginPath();
+                debugCtx.moveTo(strumZoneLeft, y);
+                debugCtx.lineTo(strumZoneRight, y);
+                debugCtx.stroke();
+
+                // Note label (mirrored)
+                debugCtx.save();
+                debugCtx.scale(-1, 1);
+                debugCtx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+                debugCtx.font = i === targetedString ? '900 12px Inter' : '700 10px Inter';
+                debugCtx.fillText(currentTuning[i]?.note || '', -(strumZoneLeft - 4), y + 4);
+                debugCtx.restore();
+            }
+
+            // FRET zone dimensions (RIGHT half of raw = HIGH X = appears on LEFT)
+            const fretZoneLeft = midX + 8;
+            const fretZoneRight = zoneLeft + zoneWidth - 8;
+            const fretZoneWidth = fretZoneRight - fretZoneLeft;
+
+            // Draw strings extended into FRET zone at 50% opacity
+            for (let i = 0; i < numStrings; i++) {
+                const y = strumZoneTop + stringSpacing * (i + 0.5);
+                const color = CONFIG.stringColors[i];
+
+                // Highlight if this string is being fretted
+                const isFretted = frettedStrings[i] !== undefined;
+
+                if (isFretted) {
+                    debugCtx.shadowColor = '#' + color.toString(16).padStart(6, '0');
+                    debugCtx.shadowBlur = 10;
                 }
 
-            } else {
-                // NORMAL MODE: Vertical - strings left to right
-                stringYPositions = []; // Not used in normal mode
-                const stringSpacing = zoneWidth / numStrings;
+                // Draw string in fret zone at 50% opacity
+                debugCtx.globalAlpha = isFretted ? 0.9 : 0.5;
+                debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+                debugCtx.lineWidth = isFretted ? 4 : 2;
+                debugCtx.beginPath();
+                debugCtx.moveTo(fretZoneLeft, y);
+                debugCtx.lineTo(fretZoneRight, y);
+                debugCtx.stroke();
+                debugCtx.globalAlpha = 1;
+                debugCtx.shadowBlur = 0;
+            }
 
-                for (let i = 0; i < numStrings; i++) {
-                    const x = zoneLeft + stringSpacing * (i + 0.5);
-                    const color = CONFIG.stringColors[i];
+            // Draw fret markers
+            debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+            debugCtx.lineWidth = 1;
+            for (let f = 1; f <= 12; f++) {
+                const x = fretZoneLeft + (f / 12) * fretZoneWidth;
+                debugCtx.beginPath();
+                debugCtx.moveTo(x, zoneTop + strumPadTop);
+                debugCtx.lineTo(x, zoneTop + zoneHeight - strumPadBottom);
+                debugCtx.stroke();
 
-                    debugCtx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
-                    debugCtx.lineWidth = 4;
-                    debugCtx.beginPath();
-                    debugCtx.moveTo(x, zoneTop + 20);
-                    debugCtx.lineTo(x, zoneTop + zoneHeight - 5);
-                    debugCtx.stroke();
-                    
-                    // Note label at top (mirrored)
+                // Fret number (mirrored)
+                if (f % 3 === 0) {
                     debugCtx.save();
                     debugCtx.scale(-1, 1);
-                    debugCtx.fillStyle = '#' + color.toString(16).padStart(6, '0');
-                    debugCtx.font = '700 10px Inter';
-                    debugCtx.fillText(currentTuning[i]?.note || '', -x - 8, zoneTop + 14);
+                    debugCtx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                    debugCtx.font = '600 9px Inter';
+                    debugCtx.fillText(f.toString(), -x - 4, zoneTop + zoneHeight - 12);
                     debugCtx.restore();
-                }
-                
-                // Draw fret lines
-                debugCtx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                debugCtx.lineWidth = 1;
-                for (let f = 1; f <= 12; f++) {
-                    const y = zoneTop + 25 + (f / 12) * (zoneHeight - 35);
-                    debugCtx.beginPath();
-                    debugCtx.moveTo(zoneLeft + 5, y);
-                    debugCtx.lineTo(zoneLeft + zoneWidth - 5, y);
-                    debugCtx.stroke();
                 }
             }
         }
@@ -1599,41 +1470,25 @@
                 });
             }
 
-            if (CONFIG.mode === 'pro') {
-                if (isLeftHand) {
-                    processProFretting(landmarks);
-                } else {
-                    processProStrumming(landmarks);
-                }
+            if (isLeftHand) {
+                processProFretting(landmarks);
             } else {
-                if (isLeftHand) {
-                    processNormalFretting(landmarks);
-                } else {
-                    processNormalStrumming(landmarks);
-                }
+                processProStrumming(landmarks);
             }
         }
 
         function landmarkToScene(lm, isLeft) {
             const bounds = getZoneBounds();
-            
+
             let nx = (lm.x - bounds.left) / (bounds.right - bounds.left);
             let ny = (lm.y - bounds.top) / (bounds.bottom - bounds.top);
-            
+
             nx = Math.max(0, Math.min(1, nx));
             ny = Math.max(0, Math.min(1, ny));
 
-            let x, y, z;
-
-            if (CONFIG.mode === 'pro') {
-                x = (nx - 0.5) * 22;
-                y = (0.5 - ny) * 8;
-                z = (0.3 - lm.z) * 6 + 2;
-            } else {
-                x = (nx - 0.5) * 12;
-                y = (0.5 - ny) * 16;
-                z = (0.3 - lm.z) * 6 + 2;
-            }
+            let x = (nx - 0.5) * 22;
+            let y = (0.5 - ny) * 8;
+            let z = (0.3 - lm.z) * 6 + 2;
 
             if (CONFIG.mirrorCamera) x = -x;
 
@@ -1781,71 +1636,6 @@
             }
         }
 
-        // NORMAL MODE FRETTING
-        function processNormalFretting(landmarks) {
-            const tips = [8, 12, 16, 20];
-            const numStrings = strings3D.length;
-
-            tips.forEach(tipIdx => {
-                const lm = landmarks[tipIdx];
-                const norm = normalizeToZone(lm);
-
-                // X position determines string
-                const stringFloat = norm.x * numStrings;
-                const stringIdx = Math.max(0, Math.min(numStrings - 1, Math.floor(stringFloat)));
-
-                // Y position determines fret (top = high fret, bottom = open)
-                const fretNorm = 1 - norm.y;
-                const fret = Math.max(0, Math.min(CONFIG.frets, Math.round(fretNorm * CONFIG.frets)));
-
-                if (lm.z < 0.12) {
-                    frettedNotes[stringIdx] = Math.max(frettedNotes[stringIdx] || 0, fret);
-                    currentFretPosition = Math.max(currentFretPosition, fret);
-                }
-            });
-
-            document.getElementById('fret-num').textContent = currentFretPosition;
-        }
-
-        // NORMAL MODE STRUMMING
-        function processNormalStrumming(landmarks) {
-            const indexTip = landmarks[8];
-            const norm = normalizeToZone(indexTip);
-            const numStrings = strings3D.length;
-
-            for (let i = 0; i < numStrings; i++) {
-                const stringCenter = (i + 0.5) / numStrings;
-                const dist = Math.abs(norm.x - stringCenter);
-
-                if (dist < CONFIG.stringDetectionWidth) {
-                    const lastPos = lastStrumPos[i];
-
-                    if (lastPos !== undefined) {
-                        const velocity = Math.abs(norm.y - lastPos);
-
-                        if (velocity > CONFIG.strumSensitivity && !strumCooldown[i]) {
-                            const fret = frettedNotes[i] || 0;
-                            const note = getNoteAtFret(i, fret);
-
-                            playNote(note, Math.min(1, velocity * 20));
-                            triggerStringGlow(i);
-
-                            strumCooldown[i] = true;
-                            setTimeout(() => strumCooldown[i] = false, 100);
-
-                            document.getElementById('dbg-string').textContent = currentTuning[i]?.note || '';
-                            document.getElementById('dbg-note').textContent = note;
-                            document.getElementById('dbg-fret').textContent = fret;
-                        }
-                    }
-
-                    lastStrumPos[i] = norm.y;
-                } else {
-                    lastStrumPos[i] = undefined;
-                }
-            }
-        }
-
         function updateDebugPanel() {
             if (!CONFIG.showDebug) return;
 
@@ -1872,22 +1662,6 @@
         function initUI() {
             document.getElementById('settings-toggle').addEventListener('click', () => {
                 document.getElementById('settings-sidebar').classList.toggle('open');
-            });
-
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    CONFIG.mode = btn.dataset.mode;
-                    document.getElementById('mode-badge').textContent = CONFIG.mode.toUpperCase();
-                    document.getElementById('tuning-panel').classList.toggle('visible', CONFIG.mode === 'pro');
-
-                    createGuitar();
-                    setCameraForMode();
-                    frettedNotes = {};
-                    lastStrumPos = {};
-                    currentFretPosition = 0;
-                });
             });
 
             document.querySelectorAll('.guitar-type-btn').forEach(btn => {
