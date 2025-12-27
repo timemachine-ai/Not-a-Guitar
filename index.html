@@ -1103,12 +1103,13 @@
         let currentFretPosition = 0;
 
         // Auto Pilot (Microphone) state
-        let mic, micMeter, micFollower;
+        let mic, micMeter, micAnalyser, pitchAnalyserNode, pitchDataArray;
         let micReady = false;
         let lastVocalStrum = 0;
         let currentMicLevel = 0;
         let previousMicLevel = 0;
         let micSilenceFrames = 0; // Count frames of relative silence for onset detection
+        let detectedPitch = 0; // Detected voice pitch in Hz for string matching
 
         // ==================== THREE.JS ====================
         let scene, camera, renderer;
@@ -1411,16 +1412,23 @@
                 // Create meter for level detection
                 micMeter = new Tone.Meter({ smoothing: 0.8 });
 
-                // Create envelope follower for peak detection
-                micFollower = new Tone.Follower(0.1);
+                // Create analyser for pitch detection
+                micAnalyser = new Tone.Analyser('fft', 2048);
 
-                // Connect mic to meter
+                // Connect mic to meter and analyser
                 mic.connect(micMeter);
-                mic.connect(micFollower);
+                mic.connect(micAnalyser);
+
+                // Also create raw Web Audio analyser for better pitch detection
+                pitchAnalyserNode = Tone.context.createAnalyser();
+                pitchAnalyserNode.fftSize = 2048;
+                pitchAnalyserNode.smoothingTimeConstant = 0.8;
+                pitchDataArray = new Float32Array(pitchAnalyserNode.fftSize);
+                mic.connect(pitchAnalyserNode);
 
                 micReady = true;
                 document.getElementById('mic-status').classList.add('active');
-                console.log('Microphone initialized');
+                console.log('Microphone initialized with pitch detection');
 
                 // Start the mic monitoring loop
                 requestAnimationFrame(micMonitorLoop);
@@ -1429,6 +1437,76 @@
                 console.error('Microphone initialization failed:', err);
                 micReady = false;
             }
+        }
+
+        // Autocorrelation-based pitch detection (more accurate for voice)
+        function detectPitch() {
+            if (!pitchAnalyserNode || !pitchDataArray) return 0;
+
+            pitchAnalyserNode.getFloatTimeDomainData(pitchDataArray);
+
+            // Find the RMS (volume) first
+            let rms = 0;
+            for (let i = 0; i < pitchDataArray.length; i++) {
+                rms += pitchDataArray[i] * pitchDataArray[i];
+            }
+            rms = Math.sqrt(rms / pitchDataArray.length);
+
+            // If too quiet, no pitch
+            if (rms < 0.01) return 0;
+
+            // Autocorrelation
+            const sampleRate = Tone.context.sampleRate;
+            const minFreq = 60;  // Lowest frequency to detect (Hz)
+            const maxFreq = 500; // Highest frequency to detect (Hz)
+            const minPeriod = Math.floor(sampleRate / maxFreq);
+            const maxPeriod = Math.floor(sampleRate / minFreq);
+
+            let bestCorrelation = 0;
+            let bestPeriod = 0;
+
+            for (let period = minPeriod; period < maxPeriod; period++) {
+                let correlation = 0;
+                for (let i = 0; i < pitchDataArray.length - period; i++) {
+                    correlation += pitchDataArray[i] * pitchDataArray[i + period];
+                }
+                correlation /= (pitchDataArray.length - period);
+
+                if (correlation > bestCorrelation) {
+                    bestCorrelation = correlation;
+                    bestPeriod = period;
+                }
+            }
+
+            // Only return pitch if correlation is strong enough
+            if (bestCorrelation > 0.01 && bestPeriod > 0) {
+                return sampleRate / bestPeriod;
+            }
+
+            return 0;
+        }
+
+        // Map detected pitch to the closest guitar string
+        function pitchToStringIndex(pitch, numStrings) {
+            if (pitch <= 0) return Math.floor(numStrings / 2); // Default to middle string
+
+            // Get open string frequencies
+            const stringFreqs = currentTuning.slice(0, numStrings).map(t => t.freq);
+
+            // Find closest string by frequency
+            let closestIdx = 0;
+            let minDiff = Infinity;
+
+            for (let i = 0; i < stringFreqs.length; i++) {
+                // Compare in log scale (musical intervals)
+                const diff = Math.abs(Math.log2(pitch) - Math.log2(stringFreqs[i]));
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIdx = i;
+                }
+            }
+
+            return closestIdx;
         }
 
         function micMonitorLoop() {
@@ -1443,6 +1521,9 @@
             // Convert to 0-1 range (roughly)
             const level = Math.max(0, Math.min(1, (levelDb + 60) / 60));
             currentMicLevel = level;
+
+            // Detect pitch continuously for voice-following
+            detectedPitch = detectPitch();
 
             // Update visual level bar
             const levelFill = document.getElementById('mic-level-fill');
@@ -1479,7 +1560,7 @@
             const wasQuiet = micSilenceFrames > 5 || previousMicLevel < CONFIG.micSensitivity * 0.3;
 
             if (level > CONFIG.micSensitivity && cooldownOk && (isOnset || wasQuiet)) {
-                triggerVocalStrum(level);
+                triggerVocalStrum(level, detectedPitch);
                 lastVocalStrum = now;
                 micSilenceFrames = 0;
             }
@@ -1488,7 +1569,7 @@
             requestAnimationFrame(micMonitorLoop);
         }
 
-        function triggerVocalStrum(intensity) {
+        function triggerVocalStrum(intensity, voicePitch = 0) {
             if (!audioReady) return;
 
             const numStrings = strings3D.length;
@@ -1520,10 +1601,11 @@
                 document.getElementById('dbg-note').textContent = getNoteAtFret(lastIdx, frettedNotes[lastIdx]);
                 document.getElementById('dbg-fret').textContent = frettedNotes[lastIdx];
             } else {
-                // No frets pressed - play a single rotating string (sounds better than all at once)
-                const stringIdx = Math.floor(Date.now() / 500) % numStrings;
+                // No frets pressed - match voice pitch to closest string!
+                // Sing high → high strings, sing low → low strings
+                const stringIdx = pitchToStringIndex(voicePitch, numStrings);
 
-                playStringNote(stringIdx, 0, velocity * 0.7);
+                playStringNote(stringIdx, 0, velocity * 0.8);
                 triggerStringGlow(stringIdx);
 
                 document.getElementById('dbg-string').textContent = currentTuning[stringIdx]?.note || '';
