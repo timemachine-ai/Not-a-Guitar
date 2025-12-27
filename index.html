@@ -1103,7 +1103,7 @@
         let currentFretPosition = 0;
 
         // Auto Pilot (Microphone) state
-        let mic, micMeter, micAnalyser, pitchAnalyserNode, pitchDataArray;
+        let mic, micMeter, micAnalyser;
         let micReady = false;
         let lastVocalStrum = 0;
         let currentMicLevel = 0;
@@ -1412,19 +1412,12 @@
                 // Create meter for level detection
                 micMeter = new Tone.Meter({ smoothing: 0.8 });
 
-                // Create analyser for pitch detection
-                micAnalyser = new Tone.Analyser('fft', 2048);
+                // Create FFT analyser for pitch detection (Tone.js native)
+                micAnalyser = new Tone.FFT(2048);
 
-                // Connect mic to meter and analyser
+                // Connect mic to meter and FFT analyser
                 mic.connect(micMeter);
                 mic.connect(micAnalyser);
-
-                // Also create raw Web Audio analyser for better pitch detection
-                pitchAnalyserNode = Tone.context.createAnalyser();
-                pitchAnalyserNode.fftSize = 2048;
-                pitchAnalyserNode.smoothingTimeConstant = 0.8;
-                pitchDataArray = new Float32Array(pitchAnalyserNode.fftSize);
-                mic.connect(pitchAnalyserNode);
 
                 micReady = true;
                 document.getElementById('mic-status').classList.add('active');
@@ -1439,51 +1432,37 @@
             }
         }
 
-        // Autocorrelation-based pitch detection (more accurate for voice)
+        // FFT-based pitch detection using Tone.js FFT analyser
         function detectPitch() {
-            if (!pitchAnalyserNode || !pitchDataArray) return 0;
+            if (!micAnalyser) return 0;
 
-            pitchAnalyserNode.getFloatTimeDomainData(pitchDataArray);
-
-            // Find the RMS (volume) first
-            let rms = 0;
-            for (let i = 0; i < pitchDataArray.length; i++) {
-                rms += pitchDataArray[i] * pitchDataArray[i];
-            }
-            rms = Math.sqrt(rms / pitchDataArray.length);
-
-            // If too quiet, no pitch
-            if (rms < 0.01) return 0;
-
-            // Autocorrelation
+            const fftData = micAnalyser.getValue(); // Returns array of dB values
             const sampleRate = Tone.context.sampleRate;
-            const minFreq = 60;  // Lowest frequency to detect (Hz)
-            const maxFreq = 500; // Highest frequency to detect (Hz)
-            const minPeriod = Math.floor(sampleRate / maxFreq);
-            const maxPeriod = Math.floor(sampleRate / minFreq);
+            const binCount = fftData.length;
+            const nyquist = sampleRate / 2;
+            const binWidth = nyquist / binCount;
 
-            let bestCorrelation = 0;
-            let bestPeriod = 0;
+            // Find the frequency range for voice (80-400 Hz for most singing)
+            const minBin = Math.floor(80 / binWidth);
+            const maxBin = Math.floor(400 / binWidth);
 
-            for (let period = minPeriod; period < maxPeriod; period++) {
-                let correlation = 0;
-                for (let i = 0; i < pitchDataArray.length - period; i++) {
-                    correlation += pitchDataArray[i] * pitchDataArray[i + period];
-                }
-                correlation /= (pitchDataArray.length - period);
+            // Find the peak frequency bin
+            let maxDb = -Infinity;
+            let peakBin = 0;
 
-                if (correlation > bestCorrelation) {
-                    bestCorrelation = correlation;
-                    bestPeriod = period;
+            for (let i = minBin; i < maxBin && i < binCount; i++) {
+                if (fftData[i] > maxDb) {
+                    maxDb = fftData[i];
+                    peakBin = i;
                 }
             }
 
-            // Only return pitch if correlation is strong enough
-            if (bestCorrelation > 0.01 && bestPeriod > 0) {
-                return sampleRate / bestPeriod;
-            }
+            // Only return if signal is strong enough (above noise floor)
+            if (maxDb < -50) return 0;
 
-            return 0;
+            // Convert bin to frequency
+            const peakFreq = peakBin * binWidth;
+            return peakFreq;
         }
 
         // Map detected pitch to the closest guitar string
@@ -1493,12 +1472,12 @@
             // Get open string frequencies
             const stringFreqs = currentTuning.slice(0, numStrings).map(t => t.freq);
 
-            // Find closest string by frequency
+            // Find closest string by frequency (using log scale for musical accuracy)
             let closestIdx = 0;
             let minDiff = Infinity;
 
             for (let i = 0; i < stringFreqs.length; i++) {
-                // Compare in log scale (musical intervals)
+                // Compare in log scale (octaves don't matter, just relative pitch)
                 const diff = Math.abs(Math.log2(pitch) - Math.log2(stringFreqs[i]));
                 if (diff < minDiff) {
                     minDiff = diff;
