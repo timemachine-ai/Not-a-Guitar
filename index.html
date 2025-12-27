@@ -1052,11 +1052,44 @@
             }
         };
 
+        // Guitar types using PluckSynth (Karplus-Strong) for realistic plucked string sound
         const GUITAR_TYPES = {
-            acoustic: { oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.4, sustain: 0.3, release: 1.5 }, filterFreq: 2000, strings: 6, tuning: 'standard' },
-            electric: { oscillator: { type: 'sawtooth' }, envelope: { attack: 0.001, decay: 0.2, sustain: 0.5, release: 0.8 }, filterFreq: 4000, strings: 6, tuning: 'standard' },
-            classical: { oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.5, sustain: 0.4, release: 2.0 }, filterFreq: 1500, strings: 6, tuning: 'standard' },
-            bass: { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.3, sustain: 0.6, release: 1.0 }, filterFreq: 800, strings: 4, tuning: 'bass' }
+            acoustic: {
+                attackNoise: 1.2,
+                dampening: 3500,
+                resonance: 0.98,
+                release: 1.8,
+                strings: 6,
+                tuning: 'standard',
+                filterFreq: 3500
+            },
+            electric: {
+                attackNoise: 2.0,
+                dampening: 5000,
+                resonance: 0.99,
+                release: 2.5,
+                strings: 6,
+                tuning: 'standard',
+                filterFreq: 6000
+            },
+            classical: {
+                attackNoise: 0.8,
+                dampening: 2800,
+                resonance: 0.97,
+                release: 2.2,
+                strings: 6,
+                tuning: 'standard',
+                filterFreq: 2500
+            },
+            bass: {
+                attackNoise: 0.6,
+                dampening: 1500,
+                resonance: 0.96,
+                release: 1.5,
+                strings: 4,
+                tuning: 'bass',
+                filterFreq: 1200
+            }
         };
 
         let currentTuning = [...CONFIG.tuning.standard];
@@ -1269,7 +1302,8 @@
         }
 
         // ==================== TONE.JS ====================
-        let synth, reverb, distortion, filter;
+        let stringSynths = []; // One PluckSynth per string for polyphony
+        let reverb, distortion, filter;
         let audioReady = false;
 
         async function initAudio() {
@@ -1280,36 +1314,73 @@
         }
 
         function setupSynth() {
-            if (synth) synth.dispose();
+            // Dispose old synths
+            stringSynths.forEach(s => s && s.dispose());
+            stringSynths = [];
             if (reverb) reverb.dispose();
             if (distortion) distortion.dispose();
             if (filter) filter.dispose();
 
             const gc = GUITAR_TYPES[CONFIG.guitarType];
+            const numStrings = gc.strings;
 
-            synth = new Tone.PolySynth(Tone.Synth, {
-                oscillator: gc.oscillator,
-                envelope: {
-                    ...gc.envelope,
-                    release: CONFIG.sustain ? gc.envelope.release * 1.5 : gc.envelope.release * 0.4
-                }
-            });
-
+            // Create shared effects chain
             filter = new Tone.Filter(gc.filterFreq, 'lowpass');
-            distortion = new Tone.Distortion({ distortion: 0.5, wet: CONFIG.distortion ? 0.4 : 0 });
-            reverb = new Tone.Reverb({ decay: 2, wet: CONFIG.reverb });
+            distortion = new Tone.Distortion({ distortion: 0.4, wet: CONFIG.distortion ? 0.3 : 0 });
+            reverb = new Tone.Reverb({ decay: 1.8, wet: CONFIG.reverb });
 
-            synth.chain(filter, distortion, reverb, Tone.Destination);
-            synth.volume.value = Tone.gainToDb(CONFIG.volume);
+            // Chain effects to destination
+            filter.connect(distortion);
+            distortion.connect(reverb);
+            reverb.toDestination();
+
+            // Create one PluckSynth per string (realistic - each string independent)
+            for (let i = 0; i < numStrings; i++) {
+                const synth = new Tone.PluckSynth({
+                    attackNoise: gc.attackNoise,
+                    dampening: gc.dampening - (i * 200), // Higher strings = brighter
+                    resonance: gc.resonance,
+                    release: CONFIG.sustain ? gc.release : gc.release * 0.3
+                });
+
+                synth.volume.value = Tone.gainToDb(CONFIG.volume) + 3;
+                synth.connect(filter);
+                stringSynths.push(synth);
+            }
         }
 
-        function playNote(note, velocity = 0.8) {
-            if (!audioReady) return;
-            synth.triggerAttackRelease(note, CONFIG.sustain ? '2n' : '8n', undefined, velocity);
+        function playNote(note, velocity = 0.8, stringIndex = null) {
+            if (!audioReady || stringSynths.length === 0) return;
+
+            // If stringIndex provided, use that specific string's synth
+            // Otherwise, find an available synth or use round-robin
+            let synthToUse;
+            if (stringIndex !== null && stringSynths[stringIndex]) {
+                synthToUse = stringSynths[stringIndex];
+            } else {
+                // Use first available synth
+                synthToUse = stringSynths[0];
+            }
+
+            // PluckSynth uses triggerAttack (natural decay, no release needed)
+            synthToUse.triggerAttack(note, undefined, velocity);
 
             document.getElementById('current-note').textContent = note;
             document.getElementById('current-note').classList.add('active');
             setTimeout(() => document.getElementById('current-note').classList.remove('active'), 300);
+        }
+
+        function playStringNote(stringIdx, fret, velocity = 0.8) {
+            if (!audioReady || !stringSynths[stringIdx]) return;
+
+            const note = getNoteAtFret(stringIdx, fret);
+            stringSynths[stringIdx].triggerAttack(note, undefined, velocity);
+
+            document.getElementById('current-note').textContent = note;
+            document.getElementById('current-note').classList.add('active');
+            setTimeout(() => document.getElementById('current-note').classList.remove('active'), 300);
+
+            return note;
         }
 
         // Calculate note at a given fret - THIS IS THE REAL GUITAR LOGIC
@@ -1435,13 +1506,12 @@
                 // Play only the fretted strings with strum effect
                 frettedStringIndices.forEach((stringIdx, i) => {
                     const fret = frettedNotes[stringIdx];
-                    const note = getNoteAtFret(stringIdx, fret);
 
                     // Stagger the notes slightly for realistic strum
                     setTimeout(() => {
-                        playNote(note, velocity);
+                        playStringNote(stringIdx, fret, velocity);
                         triggerStringGlow(stringIdx);
-                    }, i * 20);
+                    }, i * 25);
                 });
 
                 // Update debug with last string
@@ -1452,13 +1522,12 @@
             } else {
                 // No frets pressed - play a single rotating string (sounds better than all at once)
                 const stringIdx = Math.floor(Date.now() / 500) % numStrings;
-                const note = getNoteAtFret(stringIdx, 0);
 
-                playNote(note, velocity * 0.7);
+                playStringNote(stringIdx, 0, velocity * 0.7);
                 triggerStringGlow(stringIdx);
 
                 document.getElementById('dbg-string').textContent = currentTuning[stringIdx]?.note || '';
-                document.getElementById('dbg-note').textContent = note;
+                document.getElementById('dbg-note').textContent = getNoteAtFret(stringIdx, 0);
                 document.getElementById('dbg-fret').textContent = '0';
             }
         }
@@ -1989,9 +2058,7 @@
                     if (velocity > CONFIG.strumSensitivity && !strumCooldown[i]) {
                         // Get the fret for this string (if any)
                         const fret = frettedNotes[i] || 0;
-                        const note = getNoteAtFret(i, fret);
-
-                        playNote(note, Math.min(1, velocity * 20));
+                        const note = playStringNote(i, fret, Math.min(1, velocity * 20));
                         triggerStringGlow(i);
 
                         strumCooldown[i] = true;
